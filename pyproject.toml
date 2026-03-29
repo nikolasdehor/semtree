@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Semantic code trees for AI assistants. Index once, feed smart context to Claude, Cursor, and Copilot."
 readme = "README.md"
 license = { text = "MIT" }
-authors = [{ name = "Nikolas DeHor" }]
+authors = [{ name = "Nikolas de Hor" }]
 requires-python = ">=3.11"
 keywords = ["ai", "context", "code-intelligence", "mcp", "claude", "copilot", "cursor", "tree-sitter"]
 classifiers = [
