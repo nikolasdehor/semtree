@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>semtree - Semantic code trees for AI assistants</title>
+  <meta name="description" content="Index your codebase once. Feed smart, token-efficient context to Claude Code, Cursor, Copilot, and Codex via MCP or CLI.">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --bg2: #161b22;
+      --bg3: #21262d;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text2: #8b949e;
+      --accent: #58a6ff;
+      --accent2: #3fb950;
+      --accent3: #d2a8ff;
+      --red: #f85149;
+      --yellow: #d29922;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* Layout */
+    .container { max-width: 900px; margin: 0 auto; padding: 0 24px; }
+
+    /* Nav */
+    nav {
+      border-bottom: 1px solid var(--border);
+      padding: 14px 0;
+    }
+    nav .inner {
+      max-width: 900px; margin: 0 auto; padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    nav .logo { font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+    nav .logo span { color: var(--accent); }
+    nav .links { display: flex; gap: 20px; font-size: 14px; color: var(--text2); }
+    nav .links a { color: var(--text2); }
+    nav .links a:hover { color: var(--text); text-decoration: none; }
+
+    /* Hero */
+    .hero {
+      padding: 80px 0 60px;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: clamp(32px, 5vw, 52px);
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1.15;
+      margin-bottom: 16px;
+    }
+    .hero h1 span { color: var(--accent); }
+    .hero p {
+      font-size: 18px;
+      color: var(--text2);
+      max-width: 620px;
+      margin: 0 auto 32px;
+    }
+    .badges { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 36px; }
+    .badges img { height: 20px; }
+
+    .cta-group { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-block;
+      padding: 10px 22px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; text-decoration: none; }
+    .btn-primary { background: var(--accent); color: #0d1117; }
+    .btn-secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+
+    /* Quick install */
+    .install-block {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px 28px;
+      max-width: 560px;
+      margin: 40px auto 0;
+      text-align: left;
+    }
+    .install-block .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text2);
+      margin-bottom: 12px;
+    }
+    .install-block code {
+      display: block;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 14px;
+      color: var(--accent2);
+      line-height: 2;
+    }
+    .install-block code .prompt { color: var(--text2); user-select: none; }
+
+    /* Section */
+    section { padding: 60px 0; border-top: 1px solid var(--border); }
+    section h2 {
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.3px;
+    }
+    section .sub {
+      color: var(--text2);
+      margin-bottom: 32px;
+      font-size: 15px;
+    }
+
+    /* Features grid */
+    .features { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+    .feature-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .feature-card .icon {
+      font-size: 22px;
+      margin-bottom: 10px;
+    }
+    .feature-card h3 { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+    .feature-card p { font-size: 13px; color: var(--text2); line-height: 1.5; }
+
+    /* Token savings */
+    .savings-box {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 28px 32px;
+      display: flex;
+      align-items: center;
+      gap: 40px;
+      flex-wrap: wrap;
+    }
+    .savings-stat { text-align: center; }
+    .savings-stat .num { font-size: 42px; font-weight: 800; letter-spacing: -1px; }
+    .savings-stat .num.green { color: var(--accent2); }
+    .savings-stat .num.red { color: var(--red); }
+    .savings-stat .lbl { font-size: 13px; color: var(--text2); margin-top: 2px; }
+    .savings-arrow { font-size: 28px; color: var(--text2); }
+    .savings-desc { flex: 1; min-width: 200px; }
+    .savings-desc p { color: var(--text2); font-size: 14px; }
+    .savings-desc code {
+      font-family: monospace;
+      background: var(--bg3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--accent);
+    }
+
+    /* Comparison table */
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+    thead th { background: var(--bg2); font-weight: 600; }
+    thead th:first-child { width: 55%; }
+    tbody tr:nth-child(even) td { background: var(--bg2); }
+    .yes { color: var(--accent2); font-weight: 600; }
+    .no  { color: var(--text2); }
+
+    /* Architecture */
+    .arch-block {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px 28px;
+      overflow-x: auto;
+    }
+    .arch-block pre {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      color: var(--text2);
+      line-height: 1.7;
+      white-space: pre;
+    }
+    .arch-block pre .hl { color: var(--accent); }
+    .arch-block pre .hl2 { color: var(--accent2); }
+
+    /* Commands */
+    .cmd-list {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .cmd-row { display: flex; gap: 12px; align-items: baseline; font-size: 13px; }
+    .cmd-row code {
+      font-family: monospace;
+      color: var(--accent2);
+      white-space: nowrap;
+      min-width: 280px;
+    }
+    .cmd-row span { color: var(--text2); }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+      color: var(--text2);
+      font-size: 13px;
+    }
+    footer a { color: var(--text2); }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 600px) {
+      .savings-box { flex-direction: column; align-items: flex-start; gap: 20px; }
+      .savings-arrow { display: none; }
+      .cmd-row { flex-direction: column; gap: 2px; }
+      .cmd-row code { min-width: unset; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="inner">
+    <span class="logo">sem<span>tree</span></span>
+    <div class="links">
+      <a href="https://github.com/nikolasdehor/semtree">GitHub</a>
+      <a href="https://github.com/nikolasdehor/semtree#readme">Docs</a>
+      <a href="https://pypi.org/project/semtree/">PyPI</a>
+    </div>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="container">
+    <h1>Semantic code trees<br>for <span>AI assistants</span></h1>
+    <p>Index your codebase once. Feed smart, token-efficient context to Claude Code, Cursor, Copilot, and Codex via MCP or CLI.</p>
+
+    <div class="badges">
+      <img src="https://img.shields.io/pypi/v/semtree.svg" alt="PyPI version">
+      <img src="https://img.shields.io/badge/python-3.11%2B-blue.svg" alt="Python 3.11+">
+      <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT License">
+      <img src="https://github.com/nikolasdehor/semtree/actions/workflows/ci.yml/badge.svg" alt="CI">
+    </div>
+
+    <div class="cta-group">
+      <a href="https://github.com/nikolasdehor/semtree" class="btn btn-primary">View on GitHub</a>
+      <a href="https://pypi.org/project/semtree/" class="btn btn-secondary">PyPI</a>
+    </div>
+
+    <div class="install-block">
+      <div class="label">Quick Start</div>
+      <code><span class="prompt">$ </span>pip install "semtree[all]"</code>
+      <code><span class="prompt">$ </span>semtree index</code>
+      <code><span class="prompt">$ </span>semtree setup --target all</code>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <section>
+    <h2>Token savings</h2>
+    <p class="sub">Stop feeding entire directories to your AI assistant.</p>
+    <div class="savings-box">
+      <div class="savings-stat">
+        <div class="num red">45K</div>
+        <div class="lbl">tokens &mdash; raw src/ directory</div>
+      </div>
+      <div class="savings-arrow">&#8594;</div>
+      <div class="savings-stat">
+        <div class="num green">6K</div>
+        <div class="lbl">tokens &mdash; semtree context</div>
+      </div>
+      <div class="savings-arrow">&#8594;</div>
+      <div class="savings-stat">
+        <div class="num green">87%</div>
+        <div class="lbl">reduction</div>
+      </div>
+      <div class="savings-desc">
+        <p>semtree extracts the symbols relevant to your specific task and stays within your budget.<br><br>
+        <code>semtree context "add rate limiting to the API" --budget 6000</code></p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Features</h2>
+    <p class="sub">Everything you need, nothing you don't.</p>
+    <div class="features">
+      <div class="feature-card">
+        <div class="icon">&#127760;</div>
+        <h3>Multi-language parsing</h3>
+        <p>tree-sitter extracts symbols and docstrings from Python, JS/TS, Go, Rust, Java, C/C++, and more.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#129504;</div>
+        <h3>Intent classification</h3>
+        <p>Weighted scoring detects whether you want to implement, debug, refactor, test, explain, review, or search &mdash; and picks the right retrieval strategy.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#128279;</div>
+        <h3>MCP native</h3>
+        <p>One command writes <code>.claude/mcp.json</code>, <code>.cursor/mcp.json</code>, and <code>.vscode/settings.json</code> automatically.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#128202;</div>
+        <h3>Token budget</h3>
+        <p>tiktoken-accurate counting keeps context within your budget. Detail level 0&ndash;3 trims output gracefully.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#128196;</div>
+        <h3>Git temporal context</h3>
+        <p>Per-symbol git author and date so the AI assistant knows which code is recent and who owns it.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#128274;</div>
+        <h3>Concurrent-safe indexing</h3>
+        <p>Lock file prevents concurrent writes. 2-second debounce stops redundant re-indexing on save hooks.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#127968;</div>
+        <h3>Local-first</h3>
+        <p>SQLite index lives in <code>.ctx/</code>. No cloud calls, no embedding API keys required.</p>
+      </div>
+      <div class="feature-card">
+        <div class="icon">&#128203;</div>
+        <h3>Project memory</h3>
+        <p>Store rules, references, and notes that get injected into context automatically on every query.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>semtree vs context-lens</h2>
+    <p class="sub">How semtree improves on the original.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>semtree</th>
+            <th>context-lens</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Multi-language docstrings (Python, JS/TS, Go, Rust)</td>
+            <td class="yes">Yes</td>
+            <td class="no">Python only</td>
+          </tr>
+          <tr>
+            <td>MCP auto-config (.claude/mcp.json)</td>
+            <td class="yes">Yes</td>
+            <td class="no">Manual</td>
+          </tr>
+          <tr>
+            <td>Hook debounce (2s cooldown)</td>
+            <td class="yes">Yes</td>
+            <td class="no">No (fires every write)</td>
+          </tr>
+          <tr>
+            <td>Git temporal context (author, date)</td>
+            <td class="yes">Yes</td>
+            <td class="no">No</td>
+          </tr>
+          <tr>
+            <td>Intent detection confidence</td>
+            <td class="yes">Weighted scoring</td>
+            <td class="no">Regex 30%</td>
+          </tr>
+          <tr>
+            <td>Typed store returns</td>
+            <td class="yes">Dataclasses</td>
+            <td class="no">Raw sqlite3.Row</td>
+          </tr>
+          <tr>
+            <td>Modular CLI</td>
+            <td class="yes">Click groups</td>
+            <td class="no">1000-line monolith</td>
+          </tr>
+          <tr>
+            <td>Concurrent-safe indexing</td>
+            <td class="yes">Lock file</td>
+            <td class="no">No protection</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Architecture</h2>
+    <p class="sub">Simple pipeline from CLI to AI assistant.</p>
+    <div class="arch-block">
+      <pre><span class="hl">CLI (semtree)</span>
+     |
+     v
+<span class="hl">Indexer</span> (coordinator.py)
+  walk &#8594; SHA-1 hash &#8594; tree-sitter parse &#8594; extract symbols &#8594; git blame
+     |
+     v
+<span class="hl">SQLite</span> (.ctx/index.db)
+  files | symbols (FTS5) | memory
+     |
+     v
+<span class="hl">Retrieval</span> (retrieval/)
+  intent classifier &#8594; search.py &#8594; policy.py
+     |
+     v
+<span class="hl">Context Builder</span> (context/builder.py)
+  budget.py + levels.py &#8594; Markdown output
+     |
+     v
+<span class="hl">MCP Server</span> (mcp.py)
+  index_project | get_context | search_symbols
+     |
+     v
+<span class="hl2">AI Assistant</span> (Claude Code / Cursor / Copilot / Codex)</pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>CLI commands</h2>
+    <p class="sub">Everything you can do from the terminal.</p>
+    <div class="cmd-list">
+      <div class="cmd-row"><code>semtree index</code><span>Index the project (incremental by default)</span></div>
+      <div class="cmd-row"><code>semtree index --force</code><span>Re-index all files, ignoring cache</span></div>
+      <div class="cmd-row"><code>semtree context "QUERY"</code><span>Build context for a task, print to stdout</span></div>
+      <div class="cmd-row"><code>semtree context "QUERY" -b 4000</code><span>Limit context to 4,000 tokens</span></div>
+      <div class="cmd-row"><code>semtree context "QUERY" -l 0</code><span>Override detail level (0=minimal, 3=full)</span></div>
+      <div class="cmd-row"><code>semtree search "QUERY"</code><span>Search symbols by name or keyword</span></div>
+      <div class="cmd-row"><code>semtree search "QUERY" -k class</code><span>Filter by kind: function|class|method|const|type|var</span></div>
+      <div class="cmd-row"><code>semtree search "QUERY" --json</code><span>Output results as JSON</span></div>
+      <div class="cmd-row"><code>semtree status</code><span>Show index stats (files, symbols, last updated)</span></div>
+      <div class="cmd-row"><code>semtree memory add rule KEY VAL</code><span>Store a project rule in the index</span></div>
+      <div class="cmd-row"><code>semtree memory list</code><span>List all memory entries</span></div>
+      <div class="cmd-row"><code>semtree setup --target all</code><span>Configure all AI assistants</span></div>
+      <div class="cmd-row"><code>semtree setup --dry-run</code><span>Preview setup changes without writing</span></div>
+      <div class="cmd-row"><code>semtree config --init</code><span>Write default config to .ctx/semtree.json</span></div>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <p>
+    <a href="https://github.com/nikolasdehor/semtree">semtree</a> &mdash;
+    MIT License &mdash;
+    <a href="https://github.com/nikolasdehor/semtree/releases">Releases</a> &mdash;
+    <a href="https://pypi.org/project/semtree/">PyPI</a>
+  </p>
+</footer>
+
+</body>
+</html>
