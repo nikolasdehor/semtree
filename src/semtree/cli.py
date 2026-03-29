@@ -14,15 +14,12 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Optional
 
 import click
 
-from . import __version__
-from .config import SemtreeConfig, find_project_root, db_path
+from . import __version__, log
+from .config import SemtreeConfig, db_path, find_project_root
 from .db.schema import init_db
-from . import log
-
 
 # ---------------------------------------------------------------------------
 # Root group
@@ -33,7 +30,7 @@ from . import log
 @click.option("--root", type=click.Path(), default=None, help="Project root (default: auto-detect)")
 @click.option("--verbose", "-v", is_flag=True, default=False, help="Verbose output")
 @click.pass_context
-def main(ctx: click.Context, root: Optional[str], verbose: bool) -> None:
+def main(ctx: click.Context, root: str | None, verbose: bool) -> None:
     """semtree - Semantic code trees for AI assistants.
 
     Index your codebase once. Feed smart, token-efficient context to
@@ -97,9 +94,9 @@ def context(
     ctx: click.Context,
     query: str,
     budget: int,
-    level: Optional[int],
-    file_filter: Optional[str],
-    output: Optional[str],
+    level: int | None,
+    file_filter: str | None,
+    output: str | None,
 ) -> None:
     """Build context for a task and print it.
 
@@ -132,9 +129,10 @@ def context(
 @click.option("--limit", "-n", default=20, show_default=True, help="Max results")
 @click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON")
 @click.pass_context
-def search(ctx: click.Context, query: str, kind: Optional[str], limit: int, as_json: bool) -> None:
+def search(ctx: click.Context, query: str, kind: str | None, limit: int, as_json: bool) -> None:
     """Search for symbols by name or keyword."""
     import json as _json
+
     from .retrieval.search import search as do_search
 
     root: Path = ctx.obj["root"]
@@ -237,14 +235,14 @@ def memory_add(ctx: click.Context, kind: str, key: str, value: str) -> None:
     root: Path = ctx.obj["root"]
     conn = init_db(db_path(root))
     mem = ProjectMemory(conn)
-    rec = mem.add(kind, key, value)
+    mem.add(kind, key, value)
     click.echo(f"Stored [{kind}] {key}")
 
 
 @memory.command("list")
 @click.option("--kind", "-k", default=None, type=click.Choice(["rule", "ref", "note"]))
 @click.pass_context
-def memory_list(ctx: click.Context, kind: Optional[str]) -> None:
+def memory_list(ctx: click.Context, kind: str | None) -> None:
     """List all memory entries."""
     from .memory.lite import ProjectMemory
 
@@ -321,7 +319,7 @@ def setup(
         click.echo(f"  {icon} {path}: {action}")
 
     if not dry_run:
-        click.echo(f"\nSetup complete. Run 'semtree index' to build the index.")
+        click.echo("\nSetup complete. Run 'semtree index' to build the index.")
 
 
 # ---------------------------------------------------------------------------

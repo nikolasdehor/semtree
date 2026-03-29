@@ -9,7 +9,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-
 _LOG_FILE: Path | None = None
 _VERBOSE: bool = False
 

@@ -11,22 +11,22 @@ Features:
 
 from __future__ import annotations
 
+import contextlib
 import os
 import sqlite3
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
 
-from ..config import SemtreeConfig, ctx_dir, db_path, lock_path
-from ..db.schema import init_db
-from ..db import store as db_store
 from .. import log
-from .walker import walk_project, detect_language
-from .hasher import sha1_file
+from ..config import SemtreeConfig, ctx_dir, db_path, lock_path
+from ..db import store as db_store
+from ..db.schema import init_db
 from .extractor import extract_symbols
 from .gitblame import annotate_symbols
-
+from .hasher import sha1_file
+from .walker import detect_language, walk_project
 
 _DEBOUNCE_SECONDS = 2.0
 
@@ -91,10 +91,8 @@ def run_index(
         stats.errors.append(str(exc))
         log.error("Index failed", error=str(exc))
     finally:
-        try:
+        with contextlib.suppress(OSError):
             lock.unlink(missing_ok=True)
-        except OSError:
-            pass
         stats.elapsed_seconds = time.monotonic() - start
 
     return stats

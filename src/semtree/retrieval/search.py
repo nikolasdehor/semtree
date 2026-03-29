@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
-from typing import Sequence
 
 from ..db.store import SymbolRecord, fts_search, get_symbols_by_name
 

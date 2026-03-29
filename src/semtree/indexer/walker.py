@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 try:
     import pathspec  # type: ignore
@@ -13,7 +13,7 @@ except ImportError:
     _HAS_PATHSPEC = False
 
 
-def _load_gitignore(root: Path) -> "pathspec.PathSpec | None":
+def _load_gitignore(root: Path) -> pathspec.PathSpec | None:
     """Parse .gitignore at root into a PathSpec matcher."""
     if not _HAS_PATHSPEC:
         return None
@@ -78,7 +78,7 @@ def _should_descend(
     dirname: str,
     parent_rel: Path,
     exclude_dirs: set[str],
-    gitignore_spec: "pathspec.PathSpec | None",
+    gitignore_spec: pathspec.PathSpec | None,
     root: Path,
 ) -> bool:
     """Return True if we should recurse into dirname."""

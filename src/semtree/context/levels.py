@@ -12,10 +12,10 @@ Level selection follows the retrieval policy's context_level setting.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
-from ..db.store import SymbolRecord, FileRecord
+from ..db.store import FileRecord, SymbolRecord
 
 
 def format_file_tree(files: Sequence[FileRecord], root: Path) -> str:

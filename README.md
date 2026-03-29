@@ -1,218 +1,233 @@
 # semtree
 
 [![PyPI version](https://img.shields.io/pypi/v/semtree.svg)](https://pypi.org/project/semtree/)
-[![Python versions](https://img.shields.io/pypi/pyversions/semtree.svg)](https://pypi.org/project/semtree/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/nikolasdehor/semtree/actions/workflows/ci.yml/badge.svg)](https://github.com/nikolasdehor/semtree/actions/workflows/ci.yml)
 
-**Semantic code trees for AI assistants.** Index once, feed smart context to Claude, Cursor, and Copilot.
+**Semantic code trees for AI assistants**
 
-semtree indexes your codebase into a local SQLite database with FTS5 full-text search, classifies your task intent, and returns a token-budgeted context block that AI assistants can actually use - not a 50k-token file dump.
+semtree indexes your codebase with tree-sitter, extracts symbols and docstrings across Python, JavaScript/TypeScript, Go, Rust, Java, C/C++, and more, and delivers token-optimized context to AI coding assistants. It exposes three MCP tools (`index_project`, `get_context`, `search_symbols`) that Claude Code, Cursor, Copilot, and Codex can call directly, and an intent classifier that selects the right retrieval strategy based on what you are trying to do.
+
+---
 
 ## Quick Start
 
 ```bash
-pip install semtree
+pip install "semtree[all]"
 semtree index
-semtree context "implement user authentication"
+semtree setup --target all
 ```
 
-That's it. The third command outputs a focused context block you can paste into Claude or any AI assistant, or let the MCP server deliver it automatically.
+The `setup` command writes config files for every assistant automatically (see [MCP Integration](#mcp-integration)).
 
-## Why semtree?
+---
 
-Most "context for AI" tools either dump entire files or require cloud embeddings. semtree takes a different approach:
+## Token savings
 
-- **Local-first**: SQLite index, no cloud calls required
-- **Intent-aware**: classifies your task (implement/debug/refactor/test/explain/review/search) and adjusts what context to include
-- **Token-budgeted**: respects your token budget, trims gracefully, never wastes tokens on irrelevant code
-- **Multi-language docstrings**: extracts Python docstrings, JS/TS JSDoc, Go comments, and Rust `///` doc comments
-- **Git context**: optionally includes last-modified author/date per symbol so AI knows what's recent
-- **MCP native**: one command to configure Claude Code, Cursor, and Copilot
+Feeding raw source files to an AI assistant wastes context. semtree extracts only the symbols relevant to your task.
 
-## Feature Comparison
+```
+Before  45,000 tokens  (entire src/ directory pasted into context)
+After    6,000 tokens  (semtree context "add rate limiting to the API")
+
+Savings: ~87%
+```
+
+The context budget is configurable (default: 8,000 tokens). Pass `--budget` on the CLI or set `default_token_budget` in `.ctx/semtree.json`.
+
+---
+
+## Why semtree vs context-lens
 
 | Feature | semtree | context-lens |
-|---------|---------|--------------|
-| Full-text search (FTS5) | Yes | Yes |
-| Intent classification | Weighted scoring, no stopword confusion | Basic keyword matching |
-| Multi-language docstrings | Python, JS/TS, Go, Rust | Python only |
-| Git blame context | Per-symbol author + date | No |
-| Token budget management | tiktoken (accurate) + char fallback | Basic |
-| MCP auto-config | `semtree setup --auto` writes .claude/mcp.json | Manual |
-| Debounced indexing | 2s debounce + lock file | No |
-| Project memory | rules/refs/notes stored in DB | No |
-| Context levels L0-L3 | Progressive detail | Single level |
-| Retrieval policies | Per-intent policies | No |
+|---|---|---|
+| Multi-language docstrings (Python, JS/TS, Go, Rust) | Yes | Python only |
+| MCP auto-config (.claude/mcp.json) | Yes | Manual |
+| Hook debounce (2s cooldown) | Yes | No (fires every write) |
+| Git temporal context (author, date) | Yes | No |
+| Intent detection confidence | Weighted scoring | Regex 30% |
+| Typed store returns | Dataclasses | Raw sqlite3.Row |
+| Modular CLI | Click groups | 1000-line monolith |
+| Concurrent-safe indexing | Lock file | No protection |
 
-## Installation
-
-```bash
-# Minimal (just indexing + CLI)
-pip install semtree
-
-# With tree-sitter for accurate parsing
-pip install "semtree[parse]"
-
-# With tiktoken for accurate token counting
-pip install "semtree[tokens]"
-
-# With MCP server support
-pip install "semtree[mcp]"
-
-# Everything
-pip install "semtree[all]"
-```
-
-## Usage
-
-### Index your project
-
-```bash
-cd /path/to/your/project
-semtree index
-```
-
-Re-runs incrementally - only changed files are re-parsed.
-
-```bash
-semtree index --force    # Re-index everything
-semtree status           # Show index stats
-```
-
-### Get context for a task
-
-```bash
-semtree context "add rate limiting to the API"
-semtree context "fix the memory leak in the connection pool" --budget 6000
-semtree context "explain the authentication flow" --level 3
-semtree context "implement payment" --file src/billing.py
-```
-
-### Search for symbols
-
-```bash
-semtree search authenticate
-semtree search "database connection" --kind function
-semtree search UserManager --json
-```
-
-### Project memory
-
-Store project-specific rules that get injected into context:
-
-```bash
-semtree memory add rule style "Always use async/await for I/O operations"
-semtree memory add ref docs "API docs at https://internal.docs/api"
-semtree memory add note todo "Refactor auth module after Q1"
-semtree memory list
-semtree memory remove rule style
-```
-
-### Set up AI assistant integration
-
-```bash
-# Auto-configure all supported assistants
-semtree setup
-
-# Just Claude Code
-semtree setup --target claude
-
-# Preview what would be written
-semtree setup --dry-run
-```
-
-This writes `.claude/mcp.json`, `.cursor/mcp.json`, and updates `.vscode/settings.json` automatically.
-
-### MCP server
-
-The MCP server exposes three tools to Claude Code and Cursor:
-
-- `index_project` - (re)index the project
-- `get_context` - get semantic context for a task
-- `search_symbols` - search for specific symbols
-
-Start it manually (usually not needed after `semtree setup`):
-
-```bash
-semtree-mcp
-```
+---
 
 ## Architecture
 
 ```
-semtree/
-  cli.py              CLI entry point (modular Click groups)
-  config.py           Project root detection + config management
-  mcp.py              MCP server (3 tools)
-  db/
-    schema.py         SQLite DDL: files, symbols, FTS5, memory tables
-    store.py          CRUD with typed returns
-  indexer/
-    coordinator.py    Orchestration: walk -> hash -> parse -> store
-    walker.py         File walker with .gitignore support
-    hasher.py         SHA-1 incremental change detection
-    parser.py         Tree-sitter parser pool (cached, thread-safe)
-    extractor.py      Symbol extraction (tree-sitter + regex fallback)
-    docstrings.py     Multi-language docstring extraction
-    gitblame.py       Per-symbol git author/date
-  retrieval/
-    intent.py         Weighted intent classifier (7 intents)
-    search.py         FTS5 + exact + prefix search
-    policy.py         Per-intent retrieval policies
-  context/
-    budget.py         Token budget (tiktoken or char estimate)
-    levels.py         L0-L3 context formatters
-    builder.py        Context assembly orchestrator
-  memory/
-    lite.py           Project memory (rules/refs/notes)
-  scripts/
-    setup.py          AI assistant integration setup
+CLI (semtree)
+     |
+     v
+Indexer (coordinator.py)
+  walk -> SHA-1 hash -> tree-sitter parse -> extract symbols -> git blame
+     |
+     v
+SQLite (.ctx/index.db)
+  files | symbols (FTS5) | memory
+     |
+     v
+Retrieval (retrieval/)
+  intent classifier -> search.py -> policy.py
+     |
+     v
+Context Builder (context/builder.py)
+  budget.py + levels.py -> Markdown output
+     |
+     v
+MCP Server (mcp.py)
+  index_project | get_context | search_symbols
+     |
+     v
+AI Assistant (Claude Code / Cursor / Copilot / Codex)
 ```
 
-### Token savings example
+---
 
-A typical FastAPI project with 150 files and 800 symbols:
+## CLI commands
 
-| Approach | Tokens sent to AI |
-|----------|------------------|
-| Dump all files | ~180,000 |
-| Dump file list only | ~2,000 |
-| **semtree context (L2)** | **~4,000** |
-| semtree context (L1 search intent) | ~1,500 |
+```
+semtree index                    Index the project (incremental by default)
+semtree index --force            Re-index all files, ignoring cache
+semtree context "QUERY"          Build context for a task, print to stdout
+semtree context "QUERY" -b 4000  Limit context to 4,000 tokens
+semtree context "QUERY" -l 0     Override detail level (0=minimal, 3=full)
+semtree context "QUERY" -f FILE  Restrict context to a single file
+semtree context "QUERY" -o FILE  Write context to a file instead of stdout
+semtree search "QUERY"           Search symbols by name or keyword
+semtree search "QUERY" -k class  Filter by kind (function|class|method|const|type|var)
+semtree search "QUERY" --json    Output results as JSON
+semtree status                   Show index stats (files, symbols, last updated)
+semtree memory add rule KEY VAL  Store a project rule in the index
+semtree memory add ref  KEY VAL  Store a file or URL reference
+semtree memory add note KEY VAL  Store a freeform note
+semtree memory list              List all memory entries
+semtree memory list -k rule      List only rules
+semtree memory remove rule KEY   Remove a memory entry
+semtree setup --target all       Configure all AI assistants (writes config files)
+semtree setup --target claude    Configure Claude Code only
+semtree setup --dry-run          Preview setup changes without writing
+semtree config                   Print current config as JSON
+semtree config --init            Write default config to .ctx/semtree.json
+```
 
-semtree selects only the symbols relevant to your specific task, formats them at the appropriate detail level, and stays within your budget.
+---
 
-## Configuration
+## MCP Integration
 
-semtree stores its index in `.ctx/` at your project root. Configuration is in `.ctx/semtree.json`:
+### Automatic (recommended)
+
+```bash
+semtree setup --target claude
+```
+
+This creates or updates `.claude/mcp.json` in your project root with the `semtree-mcp` server entry. Restart Claude Code and the three MCP tools appear automatically.
+
+### Manual
+
+Add to `.claude/mcp.json`:
 
 ```json
 {
-  "include_extensions": [".py", ".js", ".ts", ".go", ".rs"],
-  "exclude_dirs": ["node_modules", "__pycache__", ".venv"],
-  "max_file_size_kb": 512,
-  "use_gitignore": true,
-  "default_token_budget": 8000,
-  "git_context": true
+  "mcpServers": {
+    "semtree": {
+      "command": "semtree-mcp",
+      "args": [],
+      "env": {
+        "SEMTREE_ROOT": "/path/to/your/project"
+      }
+    }
+  }
 }
 ```
 
-Initialize with defaults:
+### Available MCP tools
 
-```bash
-semtree config --init
-semtree config --show
+| Tool | Description |
+|---|---|
+| `index_project` | Index (or re-index) the project. Returns file and symbol counts. |
+| `get_context` | Build a context string for a task query within a token budget. |
+| `search_symbols` | Search symbols by name or keyword with optional kind filter. |
+
+### Other assistants
+
+`semtree setup --target cursor` writes `.cursor/mcp.json`.
+
+`semtree setup --target copilot` adds a context instruction to `.vscode/settings.json`.
+
+`semtree setup --target codex` appends a context block to `AGENTS.md` (or `CODEX.md`).
+
+---
+
+## Configuration
+
+semtree reads `.ctx/semtree.json` in the project root. Run `semtree config --init` to write a config file with all defaults.
+
+```json
+{
+  "include_extensions": [".py", ".js", ".ts", ".tsx", ".jsx",
+                         ".go", ".rs", ".java", ".c", ".cpp",
+                         ".h", ".hpp", ".rb", ".php", ".swift",
+                         ".kt", ".cs", ".md", ".yaml", ".toml", ".json"],
+  "exclude_dirs": [".git", "node_modules", "__pycache__", ".venv",
+                   "dist", "build", "target", ".ctx"],
+  "max_file_size_kb": 512,
+  "use_gitignore": true,
+  "default_token_budget": 8000,
+  "git_context": true,
+  "mcp_host": "127.0.0.1",
+  "mcp_port": 5137
+}
 ```
 
-## Requirements
+| Key | Default | Description |
+|---|---|---|
+| `include_extensions` | (list above) | File extensions to index |
+| `exclude_dirs` | (list above) | Directories to skip |
+| `max_file_size_kb` | `512` | Skip files larger than this |
+| `use_gitignore` | `true` | Respect `.gitignore` patterns |
+| `default_token_budget` | `8000` | Default token limit for context output |
+| `git_context` | `true` | Annotate symbols with git author and date |
+| `mcp_host` | `127.0.0.1` | MCP server bind host |
+| `mcp_port` | `5137` | MCP server port |
 
-- Python 3.11+
-- SQLite 3.35+ (bundled with Python)
-- `click>=8.0`, `pathspec>=0.12` (installed automatically)
-- Optional: `tree-sitter>=0.25` for accurate parsing
-- Optional: `tiktoken>=0.6` for accurate token counting
-- Optional: `mcp>=1.0` for MCP server
+---
+
+## Installation
+
+Install with all optional dependencies (recommended):
+
+```bash
+pip install "semtree[all]"
+```
+
+Install only what you need:
+
+```bash
+pip install semtree            # CLI only (no parsing, no tokens, no MCP)
+pip install "semtree[parse]"   # + tree-sitter parsers (required for indexing)
+pip install "semtree[tokens]"  # + tiktoken (accurate token counting)
+pip install "semtree[mcp]"     # + MCP server support
+```
+
+Requirements: Python 3.11+, SQLite 3.35+ (bundled with Python).
+
+---
+
+## Project layout
+
+After the first `semtree index`, a `.ctx/` directory is created in your project root:
+
+```
+.ctx/
+  index.db       SQLite database (files, symbols with FTS5, memory)
+  semtree.json   Config (created by semtree config --init)
+  indexing.lock  Lock file preventing concurrent writes
+```
+
+Add `.ctx/index.db` to `.gitignore` if you do not want to commit the index.
+
+---
 
 ## License
 

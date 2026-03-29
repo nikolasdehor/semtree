@@ -8,13 +8,12 @@ Supports --dry-run to preview changes without writing.
 
 from __future__ import annotations
 
+import contextlib
 import json
-import os
 import shutil
 import sys
 from pathlib import Path
 from typing import Literal
-
 
 IntegrationTarget = Literal["claude", "cursor", "copilot", "codex", "all"]
 
@@ -85,10 +84,8 @@ def _setup_claude(
     # Merge with existing config if present
     existing: dict = {}
     if mcp_json.exists():
-        try:
+        with contextlib.suppress(json.JSONDecodeError, OSError):
             existing = json.loads(mcp_json.read_text())
-        except (json.JSONDecodeError, OSError):
-            pass
 
     if existing:
         # Merge mcpServers section

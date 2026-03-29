@@ -7,9 +7,8 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Sequence
 
 
 @dataclass(slots=True)
@@ -160,33 +159,75 @@ def replace_file_symbols(
     )
 
 
+_FTS_STOP_WORDS = frozenset({
+    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "shall",
+    "should", "may", "might", "can", "could", "to", "of", "in", "for",
+    "on", "with", "at", "by", "from", "as", "into", "this", "that",
+    "these", "those", "how", "what", "where", "when", "why", "which",
+    "and", "or", "but", "not", "if", "it", "its", "i", "my", "all",
+})
+
+
+def _to_fts_query(query: str) -> str:
+    """Convert a natural-language query to an FTS5 OR query.
+
+    Splits on whitespace, removes stop words and FTS5 special chars,
+    then joins with OR for broad matching. Each keyword also gets a
+    prefix variant (e.g. "authentication" -> "authentication OR authenticat*")
+    to handle stemming differences.
+    """
+    # Strip FTS5 special characters to avoid syntax errors
+    clean = query.replace('"', "").replace("*", "").replace("^", "").strip()
+    tokens = [t.lower() for t in clean.split() if len(t) >= 2]
+    # Filter stop words but keep tokens that look like identifiers
+    keywords = [t for t in tokens if t not in _FTS_STOP_WORDS]
+    if not keywords:
+        # All tokens were stop words - use all tokens as fallback
+        keywords = tokens
+    if not keywords:
+        return ""
+    # For each keyword >= 5 chars, also add a prefix variant covering the first
+    # 60% of the word (min 4 chars). This handles plurals, verb forms, and
+    # morphological variants without being too broad.
+    terms: list[str] = []
+    for kw in keywords:
+        terms.append(kw)
+        if len(kw) >= 5:
+            prefix_len = max(4, int(len(kw) * 0.6))
+            terms.append(f"{kw[:prefix_len]}*")
+    return " OR ".join(terms)
+
+
 def fts_search(
     conn: sqlite3.Connection,
     query: str,
     limit: int = 20,
 ) -> list[SymbolRecord]:
     """Full-text search across symbol names, signatures, and docstrings."""
-    # Sanitize query: FTS5 special chars that would cause syntax errors
-    safe_query = query.replace('"', '""').strip()
-    if not safe_query:
+    fts_query = _to_fts_query(query)
+    if not fts_query:
         return []
 
-    rows = conn.execute(
-        """
-        SELECT
-            s.id, s.file_id, f.path AS file_path,
-            s.name, s.kind, s.line_start, s.line_end,
-            s.signature, s.docstring, s.git_author, s.git_date,
-            rank
-        FROM symbols_fts
-        JOIN symbols s  ON s.id = symbols_fts.rowid
-        JOIN files   f  ON f.id = s.file_id
-        WHERE symbols_fts MATCH ?
-        ORDER BY rank
-        LIMIT ?
-        """,
-        (safe_query, limit),
-    ).fetchall()
+    try:
+        rows = conn.execute(
+            """
+            SELECT
+                s.id, s.file_id, f.path AS file_path,
+                s.name, s.kind, s.line_start, s.line_end,
+                s.signature, s.docstring, s.git_author, s.git_date,
+                rank
+            FROM symbols_fts
+            JOIN symbols s  ON s.id = symbols_fts.rowid
+            JOIN files   f  ON f.id = s.file_id
+            WHERE symbols_fts MATCH ?
+            ORDER BY rank
+            LIMIT ?
+            """,
+            (fts_query, limit),
+        ).fetchall()
+    except Exception:
+        return []
     return [_row_to_symbol(r) for r in rows]
 
 

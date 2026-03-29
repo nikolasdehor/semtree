@@ -9,15 +9,14 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .parser import parse_source
 from .docstrings import (
-    extract_python_docstring,
-    extract_jsdoc_from_lines,
     extract_go_doc_from_lines,
-    extract_rust_doc_from_lines,
+    extract_jsdoc_from_lines,
+    extract_python_docstring,
     extract_python_docstring_regex,
+    extract_rust_doc_from_lines,
 )
-
+from .parser import parse_source
 
 Symbol = dict[str, Any]
 

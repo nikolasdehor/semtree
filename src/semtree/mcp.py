@@ -16,11 +16,11 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from .config import SemtreeConfig, find_project_root, db_path
-from .db.schema import init_db
+from .config import SemtreeConfig, db_path, find_project_root
 from .context.builder import build_context, build_context_for_file
-from .retrieval.search import search, search_by_file
+from .db.schema import init_db
 from .indexer.coordinator import run_index
+from .retrieval.search import search
 
 
 def _get_root() -> Path:
@@ -44,9 +44,9 @@ def serve() -> None:
     """
     try:
         from mcp.server.fastmcp import FastMCP  # type: ignore
-    except ImportError:
+    except ImportError as exc:
         print("ERROR: mcp package not installed. Run: pip install 'semtree[mcp]'")
-        raise SystemExit(1)
+        raise SystemExit(1) from exc
 
     mcp = FastMCP("semtree")
 

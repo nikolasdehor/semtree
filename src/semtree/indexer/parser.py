@@ -9,9 +9,7 @@ Falls back gracefully when tree-sitter or a language grammar is not installed.
 from __future__ import annotations
 
 import threading
-from pathlib import Path
 from typing import Any
-
 
 _lock = threading.Lock()
 _parsers: dict[str, Any] = {}

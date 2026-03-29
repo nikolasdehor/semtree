@@ -6,7 +6,6 @@ Gracefully no-ops when git is unavailable or the file is not tracked.
 
 from __future__ import annotations
 
-import re
 import subprocess
 from functools import lru_cache
 from pathlib import Path

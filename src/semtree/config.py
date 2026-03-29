@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-
 
 # Markers that indicate a project root directory
 _ROOT_MARKERS = [
@@ -94,7 +92,7 @@ class SemtreeConfig:
     mcp_port: int = 5137
 
     @classmethod
-    def load(cls, root: Path) -> "SemtreeConfig":
+    def load(cls, root: Path) -> SemtreeConfig:
         """Load config from .ctx/semtree.json, merging with defaults."""
         path = config_path(root)
         if not path.exists():
@@ -129,6 +127,4 @@ class SemtreeConfig:
         if path.suffix not in self.include_extensions:
             return False
         size_kb = path.stat().st_size / 1024
-        if size_kb > self.max_file_size_kb:
-            return False
-        return True
+        return not size_kb > self.max_file_size_kb

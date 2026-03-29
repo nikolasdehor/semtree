@@ -9,10 +9,10 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from ..db.store import list_files
 from ..retrieval.intent import classify
 from ..retrieval.policy import get_policy
-from ..retrieval.search import search, search_by_file
-from ..db.store import list_files
+from ..retrieval.search import search
 from .budget import TokenBudget
 from .levels import format_by_level, format_file_tree
 
