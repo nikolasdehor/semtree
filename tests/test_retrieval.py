@@ -7,12 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from semtree.retrieval.intent import classify, IntentResult
+from semtree.db import store as db_store
+from semtree.db.schema import init_db
+from semtree.retrieval.intent import classify
 from semtree.retrieval.policy import get_policy
 from semtree.retrieval.search import search
-from semtree.db.schema import init_db
-from semtree.db import store as db_store
-
 
 # ---------------------------------------------------------------------------
 # Intent classifier tests

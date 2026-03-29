@@ -8,12 +8,11 @@ from pathlib import Path
 import pytest
 
 from semtree.context.budget import TokenBudget, count_tokens, fits_in_budget
-from semtree.context.levels import format_l1, format_l2, format_l3, format_by_level
 from semtree.context.builder import build_context, build_context_for_file
-from semtree.db.schema import init_db
+from semtree.context.levels import format_by_level, format_l1, format_l2, format_l3
 from semtree.db import store as db_store
+from semtree.db.schema import init_db
 from semtree.db.store import SymbolRecord
-
 
 # ---------------------------------------------------------------------------
 # Budget tests

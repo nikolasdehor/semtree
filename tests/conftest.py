@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import sqlite3
-import tempfile
 from pathlib import Path
-from typing import Generator
 
 import pytest
 
-from semtree.db.schema import init_db
 from semtree.config import SemtreeConfig
+from semtree.db.schema import init_db
 
 
 @pytest.fixture

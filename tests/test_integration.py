@@ -7,17 +7,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from click.testing import CliRunner
 
 from semtree.cli import main
-from semtree.indexer.coordinator import run_index
 from semtree.config import SemtreeConfig, db_path
-from semtree.db.schema import init_db
-from semtree.db import store as db_store
 from semtree.context.builder import build_context
+from semtree.db.schema import init_db
+from semtree.indexer.coordinator import run_index
 from semtree.memory.lite import ProjectMemory
-
 
 # ---------------------------------------------------------------------------
 # Full pipeline tests

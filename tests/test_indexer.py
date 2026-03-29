@@ -2,24 +2,20 @@
 
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
 
-import pytest
-
-from semtree.indexer.walker import walk_project, detect_language
-from semtree.indexer.hasher import sha1_file, sha1_text, is_changed
-from semtree.indexer.extractor import extract_symbols
-from semtree.indexer.docstrings import (
-    extract_jsdoc_from_lines,
-    extract_go_doc_from_lines,
-    extract_rust_doc_from_lines,
-    _clean_string_literal,
-)
-from semtree.indexer.coordinator import run_index
 from semtree.config import SemtreeConfig
 from semtree.db import store as db_store
-
+from semtree.indexer.coordinator import run_index
+from semtree.indexer.docstrings import (
+    _clean_string_literal,
+    extract_go_doc_from_lines,
+    extract_jsdoc_from_lines,
+    extract_rust_doc_from_lines,
+)
+from semtree.indexer.extractor import extract_symbols
+from semtree.indexer.hasher import is_changed, sha1_file, sha1_text
+from semtree.indexer.walker import detect_language, walk_project
 
 # ---------------------------------------------------------------------------
 # Walker tests
@@ -277,8 +273,8 @@ class TestCoordinator:
         assert stats.skipped_files == 0
 
     def test_symbols_stored_in_db(self, tmp_project: Path) -> None:
-        from semtree.db.schema import init_db
         from semtree.config import db_path
+        from semtree.db.schema import init_db
 
         config = SemtreeConfig(use_gitignore=False, git_context=False)
         run_index(tmp_project, config=config)
