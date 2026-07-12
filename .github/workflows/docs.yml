@@ -48,7 +48,7 @@ jobs:
           pip install -e .
       - name: Build site
         run: mkdocs build --strict
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: site/
 
