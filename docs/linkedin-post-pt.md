@@ -8,13 +8,13 @@ Fornecer arquivos inteiros de código fonte para a IA processar é ineficiente. 
 
 Para resolver esse desperdício de contexto, lancei o **Semtree**.
 
-O Semtree é um indexador semântico que melhora a comunicação entre o seu repositório e o seu assistente de IA. Em vez de entregar arquivos brutos, ele usa análise de AST (via tree-sitter) para extrair e fornecer apenas o esqueleto crítico do código: assinaturas de funções, tipos, docstrings e contexto do Git.
+O Semtree é um indexador estrutural que organiza a comunicação entre o seu repositório e o seu assistente de IA. Em vez de entregar arquivos brutos, ele usa análise de AST (via tree-sitter) para extrair símbolos suportados, assinaturas, tipos, docstrings e contexto do Git.
 
 Impacto prático na sua rotina:
-✅ **Economia massiva de Tokens:** Redução comprovada de até 87% nos tokens de contexto.
-✅ **Respostas mais rápidas:** Com menos texto para processar, o LLM responde em uma fração do tempo.
-✅ **Maior Precisão:** Ao eliminar o ruído visual, a IA mantém o foco estrito nas assinaturas relevantes, melhorando as sugestões e evitando o problema de perda de contexto.
-✅ **Integração MCP nativa:** Funciona de forma transparente com Claude Code, Cursor e Copilot, permitindo que a própria IA pesquise os símbolos sem exceder o orçamento estipulado.
+✅ **Orçamento explícito:** O contexto selecionado respeita um limite configurável e pode ser comparado com o volume bruto pelo benchmark local.
+✅ **Menos texto desnecessário:** A seleção pode reduzir o volume processado, conforme o repositório e a consulta.
+✅ **Limites verificáveis:** Redução de tokens não prova precisão; revisão humana e testes continuam necessários.
+✅ **Integração explícita:** Claude Code e Cursor podem usar as ferramentas MCP; Copilot e Codex recebem instruções para chamar o contexto pela CLI.
 
 Trabalhar com IA não exige jogar todo o repositório na tela. Exige entregar o contexto certo.
 
@@ -23,6 +23,6 @@ O Semtree é de código aberto e já está disponível para testes. Convido todo
 ---
 **Nikolas de Hor**
 Desenvolvedor | Goiânia, Brasil
-Projeto: https://github.com/nikolasdehor/semtree
+Projeto: https://github.com/DeHor-Labs/semtree
 
 #SoftwareDevelopment #ArtificialIntelligence #ClaudeCode #CursorAI #OpenSource #Produtividade #Semtree

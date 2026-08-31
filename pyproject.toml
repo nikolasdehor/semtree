@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "semtree"
 version = "0.1.0"
-description = "Semantic code trees for AI assistants. Index once, feed smart context to Claude, Cursor, and Copilot."
+description = "Structural code index for AI assistants. Index once, retrieve focused context."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Nikolas de Hor" }]
@@ -62,9 +62,9 @@ semtree = "semtree.cli:main"
 semtree-mcp = "semtree.mcp:serve"
 
 [project.urls]
-Homepage = "https://github.com/nikolasdehor/semtree"
-Repository = "https://github.com/nikolasdehor/semtree"
-Issues = "https://github.com/nikolasdehor/semtree/issues"
+Homepage = "https://dehor-labs.github.io/semtree/"
+Repository = "https://github.com/DeHor-Labs/semtree"
+Issues = "https://github.com/DeHor-Labs/semtree/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/semtree"]

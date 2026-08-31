@@ -14,7 +14,7 @@ Isso causa dois problemas severos. Primeiro, o uso de tokens explode, encarecend
 
 Para resolver esse gargalo, criei o **Semtree**, uma biblioteca em Python desenhada especificamente para melhorar a qualidade do contexto de assistentes de IA. 
 
-O Semtree abandona a ideia de passar texto cru. Em vez disso, ele utiliza o *tree-sitter* para analisar a sintaxe de dezenas de linguagens (Python, TypeScript, Go, Rust, Java, entre outras) e construir um índice semântico do seu projeto. 
+O Semtree abandona a ideia de passar texto cru. Em vez disso, ele utiliza o *tree-sitter* para analisar a sintaxe das linguagens hoje suportadas (Python, JavaScript/TypeScript, Go, Rust, Java, C e C++) e construir um índice estrutural do projeto.
 
 O que isso significa na prática? Quando você pede para o assistente "adicionar rate limiting na rota de login", o Semtree atua como um filtro inteligente. Em vez de ler todo o arquivo de autenticação, ele extrai apenas as informações cruciais:
 - Assinaturas de classes e métodos
@@ -23,19 +23,19 @@ O que isso significa na prática? Quando você pede para o assistente "adicionar
 
 ## Redução drástica de Tokens
 
-A vantagem mais imediata do Semtree é a economia computacional. Em testes reais, substituir a leitura bruta de arquivos pelo resumo semântico do Semtree resulta em uma redução de até 87% no uso de tokens.
+A proposta do Semtree é reduzir o volume de contexto enviado ao assistente. O resultado varia conforme repositório, consulta, linguagens suportadas, estado do índice e orçamento configurado.
 
-Por exemplo, um diretório que consumiria 45.000 tokens ao ser colado inteiramente no contexto passa a consumir cerca de 6.000 tokens com a extração focada. Essa economia permite que o modelo de IA responda muito mais rápido, reduz drasticamente seus custos com APIs pagas e mantém o modelo focado estritamente no que interessa.
+O repositório inclui um benchmark sintético reproduzível que compara o código bruto com o contexto selecionado pela versão presente no checkout. Ele mede volume, não qualidade da resposta: menos tokens pode reduzir custo e latência, mas não garante melhor precisão nem elimina perda de contexto.
 
 ## Integração nativa via MCP
 
 Ferramentas excelentes não devem exigir fluxos de trabalho complexos. O Semtree foi projetado para operar nos bastidores. Ele implementa o protocolo MCP (Model Context Protocol) de forma nativa. 
 
-Ao rodar um simples comando de setup no seu terminal, o Semtree configura automaticamente os arquivos necessários para o Claude Code, Cursor ou Copilot. A partir desse momento, o seu assistente de IA ganha três novas ferramentas para consultar o código de maneira estruturada, gerenciando um "orçamento de tokens" que você define.
+Ao rodar o comando de setup, o Semtree configura o servidor MCP para Claude Code e Cursor. Para Copilot e Codex, ele grava instruções que chamam o comando `semtree context`; esses dois alvos não recebem automaticamente as três ferramentas MCP.
 
 ## Conclusão
 
-O desenvolvimento assistido por IA deixou de ser apenas sobre geração de código e passou a ser sobre gerenciamento de contexto. Entregar menos código, porém com mais relevância semântica, é o caminho para obter sugestões mais inteligentes e rápidas.
+O desenvolvimento assistido por IA também depende de gerenciamento de contexto. O Semtree permite selecionar menos código com critérios estruturais e medir o volume entregue, sem prometer por si só respostas melhores ou mais rápidas.
 
 Se você está cansado de ver sua IA se perder em repositórios grandes, o Semtree oferece uma solução prática e de código aberto para organizar o caos.
 
@@ -43,4 +43,4 @@ Se você está cansado de ver sua IA se perder em repositórios grandes, o Semtr
 **Sobre o autor:**
 Nikolas de Hor é desenvolvedor de software em Goiânia.
 Contato: nikolasdehor79@gmail.com
-Link do projeto: https://github.com/nikolasdehor/semtree
+Link do projeto: https://github.com/DeHor-Labs/semtree

@@ -10,8 +10,8 @@
   <a href="https://pypi.org/project/semtree/"><img src="https://img.shields.io/pypi/v/semtree?color=6e40c9&label=PyPI" alt="PyPI version"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11%2B-3776ab?logo=python&logoColor=white" alt="Python 3.11+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-22c55e" alt="License MIT"></a>
-  <a href="https://github.com/nikolasdehor/semtree/actions/workflows/ci.yml"><img src="https://github.com/nikolasdehor/semtree/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/github/stars/nikolasdehor/semtree?style=flat&color=6e40c9" alt="Stars">
+  <a href="https://github.com/DeHor-Labs/semtree/actions/workflows/ci.yml"><img src="https://github.com/DeHor-Labs/semtree/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/github/stars/DeHor-Labs/semtree?style=flat&color=6e40c9" alt="Stars">
 </p>
 
 <p align="center">
@@ -24,9 +24,9 @@
 
 ---
 
-**Pare de colar arquivos inteiros no seu assistente de IA.** O Semtree usa tree-sitter para extrair apenas o que importa (assinaturas, docstrings, dependências) e entregar um contexto cirúrgico para Claude Code, Cursor, Copilot e Codex.
+**Pare de colar arquivos inteiros no seu assistente de IA.** O Semtree usa tree-sitter para extrair símbolos suportados, assinaturas e docstrings e montar contexto dentro de um orçamento configurável.
 
-Resultado prático: **Respostas mais rápidas, sugestões de código mais precisas e uma redução de até 87% no uso de tokens contextuais.** Ele expõe ferramentas MCP (`index_project`, `get_context`, `search_symbols`) para que seu assistente de IA favorite a qualidade do contexto em vez da quantidade.
+O Semtree inclui um [benchmark local](docs/benchmarks.md) que compara o volume bruto de um projeto sintético com o contexto recuperado para consultas definidas no próprio script. Ele mede o seu ambiente sem prometer uma redução fixa. O Semtree expõe ferramentas MCP (`index_project`, `get_context`, `search_symbols`) para priorizar contexto relevante em vez de volume.
 
 ---
 
@@ -38,22 +38,17 @@ semtree index
 semtree setup --target all
 ```
 
-The `setup` command writes config files for every assistant automatically (see [MCP Integration](#mcp-integration)).
+The `setup` command writes MCP configuration for Claude Code and Cursor, and CLI context instructions for Copilot and Codex (see [MCP Integration](#mcp-integration)).
 
 ---
 
-## Token Savings
+## Token Budgeting
 
 Feeding raw source files to an AI assistant wastes context. semtree extracts only the symbols relevant to your task.
 
-```
-Before  45,000 tokens  (entire src/ directory pasted into context)
-After    6,000 tokens  (semtree context "add rate limiting to the API")
+The reduction depends on repository size, query, language support, index state, and the configured budget. The bundled benchmark measures a synthetic project and prints the result from the version running locally; it is not a fixed performance promise.
 
-Savings: ~87%
-```
-
-The context budget is configurable (default: 8,000 tokens). Pass `--budget` on the CLI or set `default_token_budget` in `.ctx/semtree.json`.
+The context budget is configurable (default: 8,000 tokens). Pass `--budget` on the CLI or set `default_token_budget` in `.ctx/semtree.json`. See [Benchmark local](docs/benchmarks.md) to reproduce the current comparison.
 
 ---
 
@@ -68,8 +63,8 @@ The intent classifier scores your query using weighted signals (keyword overlap,
 **Token-budgeted context builder**
 Context output is shaped to a configurable token budget. The detail level (0 = minimal signatures, 3 = full docstrings + git context) is chosen automatically or overridden per call.
 
-**MCP auto-configuration**
-`semtree setup` writes `.claude/mcp.json`, `.cursor/mcp.json`, `.vscode/settings.json`, and `AGENTS.md` in one command. Three MCP tools are immediately available to connected assistants.
+**Assistant setup**
+`semtree setup` writes `.claude/mcp.json` and `.cursor/mcp.json` for MCP. For Copilot and Codex, it adds instructions that call the `semtree context` CLI; those targets do not receive the three MCP tools from this setup.
 
 **Project memory**
 Store rules, references, and notes directly in the index database. Memory entries are included in context output so your AI assistant carries persistent project-specific knowledge.
@@ -126,7 +121,7 @@ MCP Server (mcp.py)
   index_project | get_context | search_symbols
      |
      v
-AI Assistant (Claude Code / Cursor / Copilot / Codex)
+MCP Client (Claude Code / Cursor)
 ```
 
 ---
