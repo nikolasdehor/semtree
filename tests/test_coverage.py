@@ -39,6 +39,7 @@ from semtree.indexer.gitblame import (
     annotate_symbols,
     blame_line,
 )
+from semtree.mcp import _build_context_request, _get_root
 from semtree.memory.lite import ProjectMemory
 from semtree.scripts.setup import (
     _find_python_entry,
@@ -48,6 +49,7 @@ from semtree.scripts.setup import (
 # ---------------------------------------------------------------------------
 # docstrings.py
 # ---------------------------------------------------------------------------
+
 
 class TestDocstringsInternal:
     def test_clean_string_literal_no_match_returns_raw(self) -> None:
@@ -111,6 +113,7 @@ class TestDocstringsInternal:
 # gitblame.py
 # ---------------------------------------------------------------------------
 
+
 class TestGitBlame:
     def test_blame_line_no_git_root(self, tmp_path: Path) -> None:
         # Clear lru_cache to avoid cross-test contamination
@@ -140,7 +143,9 @@ class TestGitBlame:
             {"name": "a", "line_start": 5, "git_author": "", "git_date": ""},
             {"name": "b", "line_start": 5, "git_author": "", "git_date": ""},
         ]
-        with patch("semtree.indexer.gitblame.blame_line", return_value=("Alice", "2025-01-01")) as mock_blame:
+        with patch(
+            "semtree.indexer.gitblame.blame_line", return_value=("Alice", "2025-01-01")
+        ) as mock_blame:
             annotate_symbols(symbols, tmp_path, "foo.py", enabled=True)
             # Called only once for line 5
             assert mock_blame.call_count == 1
@@ -208,6 +213,7 @@ class TestGitBlame:
 # ---------------------------------------------------------------------------
 # scripts/setup.py
 # ---------------------------------------------------------------------------
+
 
 class TestSetup:
     def test_setup_cursor_creates_mcp_json(self, tmp_path: Path) -> None:
@@ -289,31 +295,85 @@ class TestSetup:
         # Should have entries for all four targets
         paths = list(results.keys())
         path_str = " ".join(paths)
-        assert ".claude" in path_str
+        assert str(tmp_path / ".mcp.json") in paths
         assert ".cursor" in path_str
         assert ".vscode" in path_str
 
     def test_setup_claude_merges_existing_mcp_json(self, tmp_path: Path) -> None:
-        claude_dir = tmp_path / ".claude"
-        claude_dir.mkdir()
         existing = {
-            "mcpServers": {
-                "other-tool": {"command": "other", "args": [], "env": {}}
-            }
+            "projectSetting": True,
+            "mcpServers": {"other-tool": {"command": "other", "args": [], "env": {}}},
         }
-        (claude_dir / "mcp.json").write_text(json.dumps(existing))
+        mcp_json = tmp_path / ".mcp.json"
+        mcp_json.write_text(json.dumps(existing))
         setup_integration(tmp_path, target="claude")
-        data = json.loads((claude_dir / "mcp.json").read_text())
+        data = json.loads(mcp_json.read_text())
+        assert data["projectSetting"] is True
         assert "other-tool" in data["mcpServers"]
         assert "semtree" in data["mcpServers"]
 
     def test_setup_claude_dry_run_with_existing(self, tmp_path: Path) -> None:
-        claude_dir = tmp_path / ".claude"
-        claude_dir.mkdir()
-        (claude_dir / "mcp.json").write_text('{"mcpServers": {}}')
+        (tmp_path / ".mcp.json").write_text('{"mcpServers": {}}')
         results = setup_integration(tmp_path, target="claude", dry_run=True)
         assert any("dry-run" in v for v in results.values())
         assert any("updated" in v for v in results.values())
+
+    @pytest.mark.parametrize(
+        "existing",
+        ["not json", '{"mcpServers": []}', "[]"],
+    )
+    def test_setup_claude_does_not_overwrite_invalid_config(
+        self, tmp_path: Path, existing: str
+    ) -> None:
+        mcp_json = tmp_path / ".mcp.json"
+        mcp_json.write_text(existing)
+
+        results = setup_integration(tmp_path, target="claude")
+
+        assert mcp_json.read_text() == existing
+        assert results == {str(mcp_json): "error (invalid existing config; unchanged)"}
+
+    def test_setup_claude_does_not_follow_config_symlink(self, tmp_path: Path) -> None:
+        target = tmp_path / "target.json"
+        target.write_text('{"mcpServers": {}}')
+        mcp_json = tmp_path / ".mcp.json"
+        mcp_json.symlink_to(target)
+
+        results = setup_integration(tmp_path, target="claude")
+
+        assert target.read_text() == '{"mcpServers": {}}'
+        assert results == {str(mcp_json): "error (invalid existing config; unchanged)"}
+
+    def test_setup_claude_config_is_portable(self, tmp_path: Path) -> None:
+        setup_integration(tmp_path, target="claude")
+
+        data = json.loads((tmp_path / ".mcp.json").read_text())
+        server = data["mcpServers"]["semtree"]
+        assert server == {"command": "semtree-mcp", "args": []}
+        assert str(tmp_path) not in json.dumps(data)
+
+    def test_setup_claude_atomic_write_failure_preserves_existing(self, tmp_path: Path) -> None:
+        mcp_json = tmp_path / ".mcp.json"
+        existing = '{"mcpServers":{"other":{"command":"other"}}}'
+        mcp_json.write_text(existing)
+
+        with patch("semtree.scripts.setup.os.replace", side_effect=OSError("disk error")):
+            results = setup_integration(tmp_path, target="claude")
+
+        assert mcp_json.read_text() == existing
+        assert results == {str(mcp_json): "error (write failed; unchanged)"}
+        assert list(tmp_path.glob(".*.tmp")) == []
+
+    def test_setup_all_stops_before_other_writes_on_claude_error(self, tmp_path: Path) -> None:
+        mcp_json = tmp_path / ".mcp.json"
+        mcp_json.write_text("not json")
+
+        results = setup_integration(tmp_path, target="all")
+
+        assert results == {str(mcp_json): "error (invalid existing config; unchanged)"}
+        assert not (tmp_path / ".cursor").exists()
+        assert not (tmp_path / ".vscode").exists()
+        assert not (tmp_path / "AGENTS.md").exists()
 
     def test_find_python_entry_nonexistent(self) -> None:
         result = _find_python_entry("definitely_not_a_real_binary_xyzzy")
@@ -329,6 +389,7 @@ class TestSetup:
 # ---------------------------------------------------------------------------
 # memory/lite.py
 # ---------------------------------------------------------------------------
+
 
 class TestProjectMemory:
     @pytest.fixture
@@ -408,9 +469,11 @@ class TestProjectMemory:
 # log.py
 # ---------------------------------------------------------------------------
 
+
 class TestLog:
     def test_configure_with_log_dir(self, tmp_path: Path) -> None:
         import semtree.log as log_mod
+
         original_log_file = log_mod._LOG_FILE
         original_verbose = log_mod._VERBOSE
         try:
@@ -422,6 +485,7 @@ class TestLog:
 
     def test_log_writes_to_file(self, tmp_path: Path) -> None:
         import semtree.log as log_mod
+
         original = log_mod._LOG_FILE
         try:
             log_mod._LOG_FILE = tmp_path / "test.jsonl"
@@ -436,6 +500,7 @@ class TestLog:
 
     def test_warn_outputs_to_stdout(self, tmp_path: Path, capsys) -> None:
         import semtree.log as log_mod
+
         original_verbose = log_mod._VERBOSE
         original_log = log_mod._LOG_FILE
         try:
@@ -450,6 +515,7 @@ class TestLog:
 
     def test_error_outputs_to_stderr(self, capsys) -> None:
         import semtree.log as log_mod
+
         original_log = log_mod._LOG_FILE
         try:
             log_mod._LOG_FILE = None
@@ -461,6 +527,7 @@ class TestLog:
 
     def test_debug_silent_by_default(self, capsys) -> None:
         import semtree.log as log_mod
+
         original_verbose = log_mod._VERBOSE
         original_log = log_mod._LOG_FILE
         try:
@@ -480,6 +547,7 @@ class TestLog:
 
     def test_debug_emits_when_verbose(self, capsys) -> None:
         import semtree.log as log_mod
+
         original_verbose = log_mod._VERBOSE
         original_log = log_mod._LOG_FILE
         try:
@@ -496,6 +564,7 @@ class TestLog:
         # SEMTREE_DEBUG=1 causes debug() to call _emit(), which writes to the log file.
         # _emit() only prints to stdout when _VERBOSE=True, so check the log file instead.
         import semtree.log as log_mod
+
         original_verbose = log_mod._VERBOSE
         original_log = log_mod._LOG_FILE
         log_file = tmp_path / "semtree.jsonl"
@@ -514,6 +583,7 @@ class TestLog:
 # ---------------------------------------------------------------------------
 # config.py
 # ---------------------------------------------------------------------------
+
 
 class TestConfig:
     def test_find_project_root_finds_pyproject(self, tmp_path: Path) -> None:
@@ -536,10 +606,14 @@ class TestConfig:
     def test_config_load_from_file(self, tmp_path: Path) -> None:
         ctx = tmp_path / ".ctx"
         ctx.mkdir()
-        (ctx / "semtree.json").write_text(json.dumps({
-            "default_token_budget": 4000,
-            "git_context": False,
-        }))
+        (ctx / "semtree.json").write_text(
+            json.dumps(
+                {
+                    "default_token_budget": 4000,
+                    "git_context": False,
+                }
+            )
+        )
         cfg = SemtreeConfig.load(tmp_path)
         assert cfg.default_token_budget == 4000
         assert cfg.git_context is False
@@ -565,6 +639,11 @@ class TestConfig:
         py_file.write_text("pass")
         assert cfg.is_included(py_file) is True
 
+    def test_default_extensions_include_text_and_yml(self) -> None:
+        extensions = SemtreeConfig().include_extensions
+        assert ".txt" in extensions
+        assert ".yml" in extensions
+
     def test_config_is_included_excluded_extension(self, tmp_path: Path) -> None:
         cfg = SemtreeConfig()
         bin_file = tmp_path / "foo.exe"
@@ -587,6 +666,7 @@ class TestConfig:
 # db/schema.py and store.py
 # ---------------------------------------------------------------------------
 
+
 class TestDBSchema:
     def test_get_version(self, db: sqlite3.Connection) -> None:
         v = get_version(db)
@@ -594,10 +674,20 @@ class TestDBSchema:
 
     def test_delete_file_cascades_symbols(self, db: sqlite3.Connection) -> None:
         file_id = db_store.upsert_file(db, "test.py", "abc", 100, "python")
-        db_store.replace_file_symbols(db, file_id, [
-            {"name": "foo", "kind": "function", "line_start": 1,
-             "line_end": 5, "signature": "def foo():", "docstring": ""},
-        ])
+        db_store.replace_file_symbols(
+            db,
+            file_id,
+            [
+                {
+                    "name": "foo",
+                    "kind": "function",
+                    "line_start": 1,
+                    "line_end": 5,
+                    "signature": "def foo():",
+                    "docstring": "",
+                },
+            ],
+        )
         db.commit()
         assert db_store.count_symbols(db) == 1
         db_store.delete_file(db, "test.py")
@@ -606,12 +696,28 @@ class TestDBSchema:
 
     def test_get_symbols_by_name_with_kind(self, db: sqlite3.Connection) -> None:
         file_id = db_store.upsert_file(db, "mod.py", "sha1", 200, "python")
-        db_store.replace_file_symbols(db, file_id, [
-            {"name": "MyClass", "kind": "class", "line_start": 1, "line_end": 10,
-             "signature": "class MyClass:", "docstring": ""},
-            {"name": "MyClass", "kind": "function", "line_start": 20, "line_end": 25,
-             "signature": "def MyClass():", "docstring": ""},
-        ])
+        db_store.replace_file_symbols(
+            db,
+            file_id,
+            [
+                {
+                    "name": "MyClass",
+                    "kind": "class",
+                    "line_start": 1,
+                    "line_end": 10,
+                    "signature": "class MyClass:",
+                    "docstring": "",
+                },
+                {
+                    "name": "MyClass",
+                    "kind": "function",
+                    "line_start": 20,
+                    "line_end": 25,
+                    "signature": "def MyClass():",
+                    "docstring": "",
+                },
+            ],
+        )
         db.commit()
         classes = db_store.get_symbols_by_name(db, "MyClass", kind="class")
         assert len(classes) == 1
@@ -641,6 +747,7 @@ class TestDBSchema:
 # context/builder.py - _fit_symbols binary search path
 # ---------------------------------------------------------------------------
 
+
 class TestContextBuilderFitSymbols:
     def test_fit_symbols_empty(self) -> None:
         result = _fit_symbols([], level=2, token_budget=1000)
@@ -648,15 +755,21 @@ class TestContextBuilderFitSymbols:
 
     def test_fit_symbols_truncates_on_tight_budget(self) -> None:
         from semtree.db.store import SymbolRecord
+
         # Create many symbols to force truncation
         symbols = [
             SymbolRecord(
-                id=i, file_id=1, file_path="src/a.py",
-                name=f"function_{i}", kind="function",
-                line_start=i * 10, line_end=i * 10 + 5,
+                id=i,
+                file_id=1,
+                file_path="src/a.py",
+                name=f"function_{i}",
+                kind="function",
+                line_start=i * 10,
+                line_end=i * 10 + 5,
                 signature=f"def function_{i}(arg1, arg2, arg3) -> ReturnType:",
                 docstring="This is a long docstring. " * 20,
-                git_author="Dev", git_date="2025-01-01",
+                git_author="Dev",
+                git_date="2025-01-01",
             )
             for i in range(50)
         ]
@@ -670,10 +783,20 @@ class TestContextBuilderFitSymbols:
         # Add many files to make tree large
         for i in range(100):
             fid = db_store.upsert_file(db, f"dir_{i}/file_{i}.py", f"sha{i}", 100, "python")
-            db_store.replace_file_symbols(db, fid, [
-                {"name": f"func_{i}", "kind": "function", "line_start": 1,
-                 "line_end": 5, "signature": f"def func_{i}():", "docstring": ""},
-            ])
+            db_store.replace_file_symbols(
+                db,
+                fid,
+                [
+                    {
+                        "name": f"func_{i}",
+                        "kind": "function",
+                        "line_start": 1,
+                        "line_end": 5,
+                        "signature": f"def func_{i}():",
+                        "docstring": "",
+                    },
+                ],
+            )
         db.commit()
         # Very tight budget forces tree truncation
         result = build_context(db, "find func", token_budget=300, root=tmp_path)
@@ -683,6 +806,7 @@ class TestContextBuilderFitSymbols:
 # ---------------------------------------------------------------------------
 # coordinator.py - error and edge case paths
 # ---------------------------------------------------------------------------
+
 
 class TestCoordinatorEdgeCases:
     def test_debounce_skips_on_fresh_lock(self, tmp_project: Path) -> None:
@@ -749,9 +873,11 @@ class TestCoordinatorEdgeCases:
 # Additional targeted tests for remaining coverage gaps
 # ---------------------------------------------------------------------------
 
+
 class TestHasherOSError:
     def test_sha1_file_os_error_returns_empty(self, tmp_path: Path) -> None:
         from semtree.indexer.hasher import sha1_file
+
         nonexistent = tmp_path / "missing.py"
         result = sha1_file(nonexistent)
         assert result == ""
@@ -760,6 +886,7 @@ class TestHasherOSError:
 class TestBudgetFallback:
     def test_count_tokens_fallback_no_tiktoken(self) -> None:
         from semtree.context import budget as budget_mod
+
         original = budget_mod._HAS_TIKTOKEN
         try:
             budget_mod._HAS_TIKTOKEN = False
@@ -770,11 +897,13 @@ class TestBudgetFallback:
 
     def test_count_tokens_many(self) -> None:
         from semtree.context.budget import count_tokens_many
+
         result = count_tokens_many(["hello", "world", "test"])
         assert result > 0
 
     def test_fraction_used_zero_total(self) -> None:
         from semtree.context.budget import TokenBudget
+
         b = TokenBudget(0)
         assert b.fraction_used == 0.0
 
@@ -782,12 +911,23 @@ class TestBudgetFallback:
 class TestSearchByFile:
     def test_search_by_file_returns_results(self, tmp_path: Path) -> None:
         from semtree.retrieval.search import search_by_file
+
         conn = init_db(tmp_path / ".ctx" / "index.db")
         fid = db_store.upsert_file(conn, "src/auth/views.py", "abc", 500, "python")
-        db_store.replace_file_symbols(conn, fid, [
-            {"name": "login_view", "kind": "function", "line_start": 1,
-             "line_end": 10, "signature": "def login_view():", "docstring": ""},
-        ])
+        db_store.replace_file_symbols(
+            conn,
+            fid,
+            [
+                {
+                    "name": "login_view",
+                    "kind": "function",
+                    "line_start": 1,
+                    "line_end": 10,
+                    "signature": "def login_view():",
+                    "docstring": "",
+                },
+            ],
+        )
         conn.commit()
         results = search_by_file(conn, "auth", limit=10)
         assert len(results) > 0
@@ -795,6 +935,7 @@ class TestSearchByFile:
 
     def test_search_by_file_no_match(self, tmp_path: Path) -> None:
         from semtree.retrieval.search import search_by_file
+
         conn = init_db(tmp_path / ".ctx" / "index.db")
         results = search_by_file(conn, "nonexistent_path_xyz", limit=10)
         assert results == []
@@ -803,6 +944,7 @@ class TestSearchByFile:
 class TestIntentClassifyMany:
     def test_classify_many(self) -> None:
         from semtree.retrieval.intent import classify_many
+
         results = classify_many(["implement a feature", "fix a bug", ""])
         assert len(results) == 3
         assert results[0].intent == "implement"
@@ -811,6 +953,7 @@ class TestIntentClassifyMany:
 
     def test_classify_low_confidence_returns_search(self) -> None:
         from semtree.retrieval.intent import classify
+
         # Very ambiguous query with low score gap
         result = classify("the it a of", min_confidence=0.99)
         assert result.intent == "search"
@@ -819,6 +962,7 @@ class TestIntentClassifyMany:
 class TestAllPolicies:
     def test_all_policies_returns_dict(self) -> None:
         from semtree.retrieval.policy import all_policies
+
         policies = all_policies()
         assert len(policies) >= 7
         assert "implement" in policies
@@ -828,7 +972,7 @@ class TestAllPolicies:
 class TestFTSSearchExceptionPath:
     def test_fts_search_bad_query_returns_empty(self, db: sqlite3.Connection) -> None:
         # A query that might cause FTS5 syntax error - should be caught
-        result = db_store.fts_search(db, 'AND OR AND', limit=5)
+        result = db_store.fts_search(db, "AND OR AND", limit=5)
         # Should not raise, returns empty or some results
         assert isinstance(result, list)
 
@@ -836,6 +980,7 @@ class TestFTSSearchExceptionPath:
 class TestWalkerGitignore:
     def test_walk_with_gitignore(self, tmp_path: Path) -> None:
         from semtree.indexer.walker import walk_project
+
         # Create .gitignore that ignores *.log
         (tmp_path / ".gitignore").write_text("*.log\n")
         (tmp_path / "app.py").write_text("pass")
@@ -843,36 +988,42 @@ class TestWalkerGitignore:
 
         # .log is not in include_extensions so won't appear regardless
         # Test that gitignore parsing doesn't crash
-        files = list(walk_project(
-            tmp_path,
-            include_extensions={".py", ".log"},
-            exclude_dirs=set(),
-            use_gitignore=True,
-        ))
+        files = list(
+            walk_project(
+                tmp_path,
+                include_extensions={".py", ".log"},
+                exclude_dirs=set(),
+                use_gitignore=True,
+            )
+        )
         names = {f.name for f in files}
         assert "app.py" in names
         assert "debug.log" not in names
 
     def test_walk_excludes_gitignored_dirs(self, tmp_path: Path) -> None:
         from semtree.indexer.walker import walk_project
+
         (tmp_path / ".gitignore").write_text("build/\n")
         build_dir = tmp_path / "build"
         build_dir.mkdir()
         (build_dir / "output.py").write_text("pass")
         (tmp_path / "src.py").write_text("pass")
 
-        files = list(walk_project(
-            tmp_path,
-            include_extensions={".py"},
-            exclude_dirs=set(),
-            use_gitignore=True,
-        ))
+        files = list(
+            walk_project(
+                tmp_path,
+                include_extensions={".py"},
+                exclude_dirs=set(),
+                use_gitignore=True,
+            )
+        )
         names = {f.name for f in files}
         assert "src.py" in names
         assert "output.py" not in names
 
     def test_walk_skip_stat_error(self, tmp_path: Path) -> None:
         from semtree.indexer.walker import walk_project
+
         (tmp_path / "app.py").write_text("pass")
 
         original_stat = Path.stat
@@ -883,38 +1034,45 @@ class TestWalkerGitignore:
             return original_stat(self, follow_symlinks=follow_symlinks)
 
         with patch.object(Path, "stat", broken_stat):
-            files = list(walk_project(
-                tmp_path,
-                include_extensions={".py"},
-                exclude_dirs=set(),
-            ))
+            files = list(
+                walk_project(
+                    tmp_path,
+                    include_extensions={".py"},
+                    exclude_dirs=set(),
+                )
+            )
         # File should be skipped, not crash
         assert all(f.name != "app.py" for f in files)
 
     def test_walk_glob_pattern_exclude(self, tmp_path: Path) -> None:
         from semtree.indexer.walker import walk_project
+
         # Test wildcard exclude pattern (e.g. "*.egg-info")
         egg_dir = tmp_path / "mylib.egg-info"
         egg_dir.mkdir()
         (egg_dir / "PKG-INFO").write_text("info")
         (tmp_path / "main.py").write_text("pass")
 
-        files = list(walk_project(
-            tmp_path,
-            include_extensions={".py"},
-            exclude_dirs={"*.egg-info"},
-        ))
+        files = list(
+            walk_project(
+                tmp_path,
+                include_extensions={".py"},
+                exclude_dirs={"*.egg-info"},
+            )
+        )
         names = {f.name for f in files}
         assert "main.py" in names
 
 
 class TestSetupFallbackToPython:
-    def test_setup_claude_uses_python_module_when_no_binary(self, tmp_path: Path) -> None:
+    def test_setup_cursor_uses_python_module_when_no_binary(self, tmp_path: Path) -> None:
         # Force shutil.which and _find_python_entry to return None
-        with patch("semtree.scripts.setup.shutil.which", return_value=None), \
-             patch("semtree.scripts.setup._find_python_entry", return_value=None):
-            setup_integration(tmp_path, target="claude")
-        data = json.loads((tmp_path / ".claude" / "mcp.json").read_text())
+        with (
+            patch("semtree.scripts.setup.shutil.which", return_value=None),
+            patch("semtree.scripts.setup._find_python_entry", return_value=None),
+        ):
+            setup_integration(tmp_path, target="cursor")
+        data = json.loads((tmp_path / ".cursor" / "mcp.json").read_text())
         cmd = data["mcpServers"]["semtree"]["command"]
         args = data["mcpServers"]["semtree"]["args"]
         # Should fall back to python -m semtree.mcp
@@ -923,20 +1081,44 @@ class TestSetupFallbackToPython:
         assert "semtree.mcp" in args
 
 
+class TestMCPContextLevel:
+    def test_root_uses_claude_project_dir(self, tmp_path: Path) -> None:
+        with patch.dict(
+            os.environ,
+            {"SEMTREE_ROOT": "", "CLAUDE_PROJECT_DIR": str(tmp_path)},
+        ):
+            assert _get_root() == tmp_path
+
+    def test_file_context_preserves_level_zero(self, tmp_path: Path) -> None:
+        connection = object()
+        with (
+            patch("semtree.mcp._get_root", return_value=tmp_path),
+            patch("semtree.mcp._open_db", return_value=connection),
+            patch("semtree.mcp.build_context_for_file", return_value="context") as build,
+        ):
+            result = _build_context_request("query", 4000, 0, "src/app.py")
+
+        assert result == "context"
+        build.assert_called_once_with(connection, "src/app.py", 4000, 0)
+
+
 class TestWalkerPathspecFallback:
     def test_walk_without_pathspec(self, tmp_path: Path) -> None:
         from semtree.indexer import walker as walker_mod
+
         original = walker_mod._HAS_PATHSPEC
         try:
             walker_mod._HAS_PATHSPEC = False
             (tmp_path / "app.py").write_text("pass")
             (tmp_path / ".gitignore").write_text("*.log\n")
-            files = list(walker_mod.walk_project(
-                tmp_path,
-                include_extensions={".py"},
-                exclude_dirs=set(),
-                use_gitignore=True,
-            ))
+            files = list(
+                walker_mod.walk_project(
+                    tmp_path,
+                    include_extensions={".py"},
+                    exclude_dirs=set(),
+                    use_gitignore=True,
+                )
+            )
             names = {f.name for f in files}
             assert "app.py" in names
         finally:
@@ -944,6 +1126,7 @@ class TestWalkerPathspecFallback:
 
     def test_load_gitignore_os_error(self, tmp_path: Path) -> None:
         from semtree.indexer.walker import _load_gitignore
+
         # Create .gitignore then mock read to raise OSError
         (tmp_path / ".gitignore").write_text("*.log\n")
         with patch.object(Path, "read_text", side_effect=OSError("perm")):
@@ -952,6 +1135,7 @@ class TestWalkerPathspecFallback:
 
     def test_walk_glob_wildcard_dir_exclude(self, tmp_path: Path) -> None:
         from semtree.indexer.walker import _should_descend
+
         # The walker handles patterns ending in '*' (prefix match, e.g. "mylib*")
         result = _should_descend(
             "mylib_generated",
@@ -964,6 +1148,7 @@ class TestWalkerPathspecFallback:
 
     def test_walk_exact_dir_exclude(self, tmp_path: Path) -> None:
         from semtree.indexer.walker import _should_descend
+
         result = _should_descend(
             "node_modules",
             Path("."),
@@ -981,10 +1166,20 @@ class TestBuilderTreeTruncation:
         # Add many files to generate a large file tree
         for i in range(200):
             fid = db_store.upsert_file(conn, f"pkg_{i}/module_{i}.py", f"sha{i}", 100, "python")
-            db_store.replace_file_symbols(conn, fid, [
-                {"name": f"fn_{i}", "kind": "function", "line_start": 1,
-                 "line_end": 3, "signature": f"def fn_{i}():", "docstring": ""},
-            ])
+            db_store.replace_file_symbols(
+                conn,
+                fid,
+                [
+                    {
+                        "name": f"fn_{i}",
+                        "kind": "function",
+                        "line_start": 1,
+                        "line_end": 3,
+                        "signature": f"def fn_{i}():",
+                        "docstring": "",
+                    },
+                ],
+            )
         conn.commit()
         # Use a budget tight enough to force tree truncation but not symbol truncation
         result = build_context(conn, "find fn", token_budget=250, root=tmp_path)

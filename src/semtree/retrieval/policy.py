@@ -1,8 +1,9 @@
 """Per-task retrieval policies.
 
 Maps intent -> retrieval strategy configuration.
-Policies control how search results are filtered, ranked, and enriched
-before being handed to the context builder.
+Policies currently control preferred symbol ordering, detail level, result
+limits, budget fraction, and optional file-tree output. Relationship flags are
+reserved for future use and are not consumed by the context builder.
 """
 
 from __future__ import annotations
@@ -13,18 +14,19 @@ from dataclasses import dataclass, field
 @dataclass
 class RetrievalPolicy:
     """Retrieval parameters for a specific intent."""
+
     intent: str
 
     # Symbol kinds to prioritize (empty = include all)
     prefer_kinds: list[str] = field(default_factory=list)
 
-    # Whether to include related symbols (callers/callees) - heavier
+    # Reserved for future relationship retrieval; currently not consumed
     include_related: bool = False
 
-    # Whether to include git blame metadata
+    # Reserved policy flag; level 3 controls current git metadata formatting
     include_git_context: bool = False
 
-    # Context level: 0=names only, 1=signatures, 2=sigs+docstrings, 3=full
+    # Context level: 0/1=names and kinds, 2=signatures+docstrings, 3=full
     context_level: int = 2
 
     # Token budget fraction for retrieved symbols (0.0-1.0)
@@ -53,7 +55,7 @@ _POLICIES: dict[str, RetrievalPolicy] = {
         intent="debug",
         prefer_kinds=[],  # all kinds relevant for debugging
         include_related=True,
-        include_git_context=True,   # git context helps understand recent changes
+        include_git_context=True,
         context_level=3,
         budget_fraction=0.8,
         max_symbols=20,
@@ -84,7 +86,7 @@ _POLICIES: dict[str, RetrievalPolicy] = {
         prefer_kinds=[],
         include_related=False,
         include_git_context=False,
-        context_level=3,           # full docstrings for explanation
+        context_level=3,
         budget_fraction=0.8,
         max_symbols=15,
         include_file_tree=True,
@@ -104,7 +106,7 @@ _POLICIES: dict[str, RetrievalPolicy] = {
         prefer_kinds=[],
         include_related=False,
         include_git_context=False,
-        context_level=1,           # lighter: names + signatures only
+        context_level=1,
         budget_fraction=0.5,
         max_symbols=50,
         include_file_tree=False,

@@ -1,28 +1,28 @@
-# LinkedIn Post: Semtree e a Otimização de Contexto
+# LinkedIn Post: Semtree e a Seleção de Contexto
 
-Seu assistente de código com IA está consumindo tokens demais e entregando respostas confusas?
+Quanto contexto do repositório o seu assistente de código com IA recebe em cada tarefa?
 
-Muitos desenvolvedores reclamam que, em repositórios grandes, ferramentas como Claude Code ou Cursor começam a ignorar regras, reinventar implementações ou demorar muito para responder. A causa quase sempre é a mesma: contexto inchado.
+Em repositórios grandes, fornecer mais arquivos do que a tarefa exige pode ocupar o orçamento de contexto sem melhorar a resposta.
 
-Fornecer arquivos inteiros de código fonte para a IA processar é ineficiente. A maior parte das linhas lidas são implementações auxiliares que só servem como ruído para a tarefa atual.
+Dependendo da consulta, arquivos inteiros incluem implementações auxiliares que não participam da mudança em análise.
 
-Para resolver esse desperdício de contexto, lancei o **Semtree**.
+Para tornar esse volume observável e configurável, lancei o **Semtree**.
 
-O Semtree é um indexador semântico que melhora a comunicação entre o seu repositório e o seu assistente de IA. Em vez de entregar arquivos brutos, ele usa análise de AST (via tree-sitter) para extrair e fornecer apenas o esqueleto crítico do código: assinaturas de funções, tipos, docstrings e contexto do Git.
+O Semtree é um indexador estrutural. Com as gramáticas opcionais instaladas, ele usa árvores sintáticas do tree-sitter para extrair declarações suportadas, assinaturas, docstrings disponíveis e metadados do Git. Sem elas, algumas linguagens usam fallbacks limitados por expressões regulares.
 
-Impacto prático na sua rotina:
-✅ **Economia massiva de Tokens:** Redução comprovada de até 87% nos tokens de contexto.
-✅ **Respostas mais rápidas:** Com menos texto para processar, o LLM responde em uma fração do tempo.
-✅ **Maior Precisão:** Ao eliminar o ruído visual, a IA mantém o foco estrito nas assinaturas relevantes, melhorando as sugestões e evitando o problema de perda de contexto.
-✅ **Integração MCP nativa:** Funciona de forma transparente com Claude Code, Cursor e Copilot, permitindo que a própria IA pesquise os símbolos sem exceder o orçamento estipulado.
+O que é verificável:
+✅ **Orçamento explícito:** O contexto selecionado respeita um limite configurável e pode ser comparado com o volume bruto pelo benchmark local.
+✅ **Menos texto desnecessário:** A seleção pode reduzir o volume processado, conforme o repositório e a consulta.
+✅ **Limites verificáveis:** Redução de tokens não prova precisão; revisão humana e testes continuam necessários.
+✅ **Integração explícita:** Claude Code e Cursor podem usar as ferramentas MCP; Copilot e Codex recebem instruções para chamar o contexto pela CLI.
 
-Trabalhar com IA não exige jogar todo o repositório na tela. Exige entregar o contexto certo.
+É possível inspecionar o recorte e o volume antes de decidir se eles atendem à tarefa.
 
 O Semtree é de código aberto e já está disponível para testes. Convido todos a conferir o repositório no GitHub.
 
 ---
 **Nikolas de Hor**
 Desenvolvedor | Goiânia, Brasil
-Projeto: https://github.com/nikolasdehor/semtree
+Projeto: https://github.com/DeHor-Labs/semtree
 
 #SoftwareDevelopment #ArtificialIntelligence #ClaudeCode #CursorAI #OpenSource #Produtividade #Semtree

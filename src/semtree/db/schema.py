@@ -2,7 +2,7 @@
 
 Design goals:
 - FTS5 full-text search on symbol names and docstrings
-- Vec-ready: embedding column stored as BLOB (sqlite-vec compatible)
+- Reserved embedding column; the current release does not populate or query it
 - Incremental hashing: skip re-parse if SHA-1 unchanged
 - Lean writes: single transaction per file update
 """
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS symbols (
     line_end    INTEGER NOT NULL,
     signature   TEXT    NOT NULL DEFAULT '',
     docstring   TEXT    NOT NULL DEFAULT '',
-    embedding   BLOB,                     -- float32 array, NULL until embedded
+    embedding   BLOB,                     -- reserved; currently remains NULL
     git_author  TEXT    NOT NULL DEFAULT '',
     git_date    TEXT    NOT NULL DEFAULT ''
 );

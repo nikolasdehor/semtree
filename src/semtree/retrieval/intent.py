@@ -7,14 +7,9 @@ Fixes the overlapping-keyword problem from naive implementations by:
   4. Context-aware disambiguation: "test" and "fix" are NOT stopwords
      when they're the primary verb of the query
 
-Intent categories and their retrieval implications:
-  - implement   -> full signatures + docstrings, similar file context
-  - debug       -> recent changes (git context), error-adjacent symbols
-  - refactor    -> all references to target symbol, callers/callees
-  - test        -> module under test, existing test patterns
-  - explain     -> rich docstrings, class hierarchies
-  - review      -> file-level overview, recent modifications
-  - search      -> FTS5 keyword search, broad context
+Intent categories select policies for preferred symbol kinds, detail level,
+result limits, budget fraction, and optional file-tree output. The classifier
+does not resolve references, callers, dependencies, or class hierarchies.
 """
 
 from __future__ import annotations
@@ -27,7 +22,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class IntentResult:
     intent: str
-    confidence: float   # 0.0 - 1.0
+    confidence: float  # 0.0 - 1.0
     matched_triggers: list[str]
 
 
@@ -119,10 +114,7 @@ _COMPILED: dict[str, list[tuple[re.Pattern, float]]] = {}
 
 def _compile() -> None:
     for intent, patterns in _TRIGGERS.items():
-        _COMPILED[intent] = [
-            (re.compile(p, re.IGNORECASE), w)
-            for p, w in patterns
-        ]
+        _COMPILED[intent] = [(re.compile(p, re.IGNORECASE), w) for p, w in patterns]
 
 
 _compile()

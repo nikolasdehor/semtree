@@ -1,0 +1,26 @@
+# Semtree
+
+> Ferramenta open source que indexa símbolos de código localmente e entrega contexto selecionado para assistentes de IA.
+
+Documentação canônica: https://dehor-labs.github.io/semtree/
+Repositório: https://github.com/DeHor-Labs/semtree
+Pacote: https://pypi.org/project/semtree/
+
+## Comece aqui
+
+- [Instalação](https://dehor-labs.github.io/semtree/getting-started/install/)
+- [Quickstart](https://dehor-labs.github.io/semtree/getting-started/quickstart/)
+- [Integrações](https://dehor-labs.github.io/semtree/getting-started/integrations/)
+- [Como funciona](https://dehor-labs.github.io/semtree/concepts/how-it-works/)
+- [CLI](https://dehor-labs.github.io/semtree/cli/)
+- [Servidor MCP](https://dehor-labs.github.io/semtree/mcp/)
+- [Benchmarks](https://dehor-labs.github.io/semtree/benchmarks/)
+- [Caso técnico](https://dehor-labs.github.io/semtree/case-study/)
+- [FAQ](https://dehor-labs.github.io/semtree/faq/)
+- [Privacidade](https://dehor-labs.github.io/semtree/privacy/)
+
+## Limites
+
+- A seleção de contexto pode reduzir volume, mas também pode omitir símbolos relevantes.
+- A redução de tokens varia por repositório e consulta.
+- O índice local não substitui revisão humana nem testes do código sugerido por modelos.

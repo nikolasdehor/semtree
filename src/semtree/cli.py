@@ -25,13 +25,14 @@ from .db.schema import init_db
 # Root group
 # ---------------------------------------------------------------------------
 
+
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 @click.version_option(__version__, "-V", "--version")
 @click.option("--root", type=click.Path(), default=None, help="Project root (default: auto-detect)")
 @click.option("--verbose", "-v", is_flag=True, default=False, help="Verbose output")
 @click.pass_context
 def main(ctx: click.Context, root: str | None, verbose: bool) -> None:
-    """semtree - Semantic code trees for AI assistants.
+    """semtree - Structural code index for AI assistants.
 
     Index your codebase once. Feed smart, token-efficient context to
     Claude, Cursor, Copilot, and Codex.
@@ -46,8 +47,11 @@ def main(ctx: click.Context, root: str | None, verbose: bool) -> None:
 # index
 # ---------------------------------------------------------------------------
 
+
 @main.command()
-@click.option("--force", "-f", is_flag=True, default=False, help="Re-index all files (ignore cache)")
+@click.option(
+    "--force", "-f", is_flag=True, default=False, help="Re-index all files (ignore cache)"
+)
 @click.option("--quiet", "-q", is_flag=True, default=False, help="Suppress progress output")
 @click.pass_context
 def index(ctx: click.Context, force: bool, quiet: bool) -> None:
@@ -83,12 +87,15 @@ def index(ctx: click.Context, force: bool, quiet: bool) -> None:
 # context
 # ---------------------------------------------------------------------------
 
+
 @main.command()
 @click.argument("query")
 @click.option("--budget", "-b", default=8000, show_default=True, help="Token budget")
 @click.option("--level", "-l", type=click.IntRange(0, 3), default=None, help="Detail level 0-3")
 @click.option("--file", "-f", "file_filter", default=None, help="Restrict to file path")
-@click.option("--output", "-o", type=click.Path(), default=None, help="Write to file instead of stdout")
+@click.option(
+    "--output", "-o", type=click.Path(), default=None, help="Write to file instead of stdout"
+)
 @click.pass_context
 def context(
     ctx: click.Context,
@@ -108,7 +115,8 @@ def context(
     conn = init_db(db_path(root))
 
     if file_filter:
-        result = build_context_for_file(conn, file_filter, budget, level or 2)
+        detail_level = level if level is not None else 2
+        result = build_context_for_file(conn, file_filter, budget, detail_level)
     else:
         result = build_context(conn, query, budget, root, force_level=level)
 
@@ -123,9 +131,12 @@ def context(
 # search
 # ---------------------------------------------------------------------------
 
+
 @main.command()
 @click.argument("query")
-@click.option("--kind", "-k", default=None, help="Filter by kind: function|class|method|const|type|var")
+@click.option(
+    "--kind", "-k", default=None, help="Filter by kind: function|class|method|const|type|var"
+)
 @click.option("--limit", "-n", default=20, show_default=True, help="Max results")
 @click.option("--json", "as_json", is_flag=True, default=False, help="Output as JSON")
 @click.pass_context
@@ -173,6 +184,7 @@ def search(ctx: click.Context, query: str, kind: str | None, limit: int, as_json
 # status
 # ---------------------------------------------------------------------------
 
+
 @main.command()
 @click.pass_context
 def status(ctx: click.Context) -> None:
@@ -193,6 +205,7 @@ def status(ctx: click.Context) -> None:
     latest = max((f.indexed_at for f in files), default=0.0) if files else 0.0
 
     import time
+
     age = int(time.time() - latest) if latest else 0
     age_str = f"{age}s ago" if age < 60 else f"{age // 60}m ago"
 
@@ -210,6 +223,7 @@ def status(ctx: click.Context) -> None:
 # ---------------------------------------------------------------------------
 # memory
 # ---------------------------------------------------------------------------
+
 
 @main.group()
 @click.pass_context
@@ -280,6 +294,7 @@ def memory_remove(ctx: click.Context, kind: str, key: str) -> None:
 # setup
 # ---------------------------------------------------------------------------
 
+
 @main.command()
 @click.option(
     "--target",
@@ -302,7 +317,7 @@ def setup(
 ) -> None:
     """Set up AI assistant integrations.
 
-    Creates config files for Claude Code (.claude/mcp.json),
+    Creates config files for Claude Code (.mcp.json),
     Cursor (.cursor/mcp.json), Copilot (.vscode/settings.json),
     and Codex (AGENTS.md).
     """
@@ -318,6 +333,15 @@ def setup(
         icon = "+" if "created" in action else ("~" if "updated" in action else "-")
         click.echo(f"  {icon} {path}: {action}")
 
+    if any(action.startswith("error") for action in results.values()):
+        raise click.ClickException("Setup incomplete; existing files were left unchanged.")
+
+    if target in ("claude", "all"):
+        click.echo(
+            "\nClaude Code asks you to approve project-scoped servers from .mcp.json "
+            "before first use."
+        )
+
     if not dry_run:
         click.echo("\nSetup complete. Run 'semtree index' to build the index.")
 
@@ -326,9 +350,12 @@ def setup(
 # config
 # ---------------------------------------------------------------------------
 
+
 @main.command("config")
 @click.option("--show", is_flag=True, default=False, help="Print current config as JSON")
-@click.option("--init", is_flag=True, default=False, help="Write default config to .ctx/semtree.json")
+@click.option(
+    "--init", is_flag=True, default=False, help="Write default config to .ctx/semtree.json"
+)
 @click.pass_context
 def config_cmd(ctx: click.Context, show: bool, init: bool) -> None:
     """Show or initialize project configuration."""

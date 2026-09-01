@@ -1,79 +1,71 @@
 # Servidor MCP
 
-O Semtree expõe três tools via MCP (Model Context Protocol) para uso por agentes de IA.
+O executável `semtree-mcp` inicia um servidor MCP por `stdio` e expõe três ferramentas. O diretório do projeto vem primeiro de `SEMTREE_ROOT`; no Claude Code, o fallback é `CLAUDE_PROJECT_DIR`. Sem essas variáveis, o servidor procura a raiz a partir do diretório atual.
 
-## Tools registradas
+## `index_project`
 
-### `index_project`
-
-Indexa um projeto pelo path.
+Indexa o projeto atual de forma incremental ou força uma reindexação.
 
 ```json
 {
   "name": "index_project",
   "arguments": {
-    "path": "/Users/nikolas/code/meu-app",
     "force": false
   }
 }
 ```
 
-Retorna estatísticas do índice criado (símbolos por tipo, linguagens, tempo de indexação).
+A resposta informa status, raiz, contagens de arquivos e símbolos, duração e até cinco erros de indexação.
 
-### `get_context`
+## `get_context`
 
-Gera contexto otimizado para uma query.
+Monta contexto para uma consulta dentro de um orçamento.
 
 ```json
 {
   "name": "get_context",
   "arguments": {
-    "query": "implementar logout no endpoint /auth",
-    "limit": 10
+    "query": "entender a validação de sessão",
+    "token_budget": 4000,
+    "level": 2,
+    "file": null
   }
 }
 ```
 
-Retorna símbolos relevantes ordenados por score BM25.
+Parâmetros:
 
-### `search_symbols`
+- `query` é obrigatório;
+- `token_budget` tem padrão 8000;
+- `level` recebe um inteiro opcional; use valores de 0 a 3, como na CLI;
+- `file` restringe o contexto ao caminho informado.
 
-Busca por nome de símbolo.
+## `search_symbols`
+
+Pesquisa nomes, assinaturas e docstrings por correspondência exata, FTS5 ou prefixo.
 
 ```json
 {
   "name": "search_symbols",
   "arguments": {
-    "pattern": "AuthHandler",
-    "kind": "class"
+    "query": "AuthHandler",
+    "kind": "class",
+    "limit": 20
   }
 }
 ```
 
-## Setup do cliente
+A resposta contém os símbolos encontrados e seus metadados. O filtro `kind` é opcional.
 
-Veja [Integrações](getting-started/integrations.md) para configurar Claude Desktop, Cursor, Codex.
+## Executar
 
-## Transport
-
-Por padrão usa **stdio** (padrão MCP, ideal para clientes desktop).
-
-Para HTTP (útil em CI ou ambientes containerizados):
+Instale o extra MCP e inicie o processo:
 
 ```bash
-semtree mcp --transport http --port 8000
+pip install "semtree[mcp]"
+SEMTREE_ROOT=/caminho/do/projeto semtree-mcp
 ```
 
-Endpoint MCP-compatível em `http://localhost:8000/mcp`.
+A implementação atual usa somente `stdio`; não expõe transporte HTTP nem endpoint de rede.
 
-## Workflow tipico
-
-Em uma conversa com Claude:
-
-1. Usuário: "ajude a refatorar a função login"
-2. Claude chama `index_project(".")` se ainda não indexado
-3. Claude chama `get_context("refatorar login")` para entender a função e suas dependências
-4. Claude lê só os símbolos retornados (200-500 tokens)
-5. Resposta cirúrgica, sem o ruído de arquivos inteiros
-
-Tudo isso acontece automaticamente: você só faz a pergunta em linguagem natural.
+O comando `semtree setup --target claude` grava `.mcp.json` na raiz; `semtree-mcp` deve estar no PATH do Claude Code, que fornece `CLAUDE_PROJECT_DIR` ao processo. O Claude Code exige aprovação do servidor de escopo do projeto antes do primeiro uso. `--target cursor` grava `.cursor/mcp.json`. Consulte [Integrações](getting-started/integrations.md) para exemplos e use `--dry-run` antes de escrever arquivos.

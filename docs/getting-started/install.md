@@ -2,51 +2,60 @@
 
 ## Pré-requisitos
 
-- **Python 3.11+** (verifique com `python --version`)
-- macOS, Linux ou Windows com WSL
+- Python 3.11 ou mais recente;
+- SQLite com FTS5, normalmente incluído nas distribuições atuais do Python.
 
-## Métodos suportados
+## Instalação recomendada
 
-=== "pipx (recomendado)"
+O extra `all` inclui parsing, contagem de tokens e servidor MCP:
+
+=== "pipx"
 
     ```bash
-    pipx install semtree
+    pipx install "semtree[all]"
     ```
-
-    Isola o pacote em ambiente próprio. Após instalar, `semtree` fica no PATH.
 
 === "uv tool"
 
     ```bash
-    uv tool install semtree
+    uv tool install "semtree[all]"
     ```
 
-    Mais rápido que pipx, mesmo resultado.
-
-=== "pip (em venv)"
+=== "pip em ambiente virtual"
 
     ```bash
     python -m venv .venv
     source .venv/bin/activate
-    pip install semtree
+    pip install "semtree[all]"
     ```
 
-=== "Como dependência"
+## Extras opcionais
 
-    ```bash
-    uv add semtree
-    # ou
-    pip install semtree
-    ```
+Instale apenas o necessário quando quiser controlar as dependências:
 
-## Verificar instalação
+```bash
+pip install semtree
+pip install "semtree[parse]"
+pip install "semtree[tokens]"
+pip install "semtree[mcp]"
+```
+
+- o pacote base fornece a CLI, SQLite e fallback limitado por expressões regulares;
+- `parse` instala as oito gramáticas tree-sitter usadas pela extração estrutural;
+- `tokens` instala o contador tiktoken;
+- `mcp` instala o servidor `semtree-mcp`.
+
+## Verificar
 
 ```bash
 semtree --version
 semtree --help
+python -c "import semtree.mcp"
 ```
+
+O import confirma que o módulo MCP está disponível sem iniciar o servidor `stdio`.
 
 ## Próximos passos
 
 - [Quickstart](quickstart.md)
-- [Integrações com Claude/Cursor/Copilot](integrations.md)
+- [Integrações](integrations.md)

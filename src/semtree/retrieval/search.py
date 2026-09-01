@@ -1,9 +1,7 @@
-"""FTS5 + optional semantic search fallback.
+"""Exact-name, SQLite FTS5, and prefix search over indexed symbols.
 
-Primary path: SQLite FTS5 (always available, zero deps)
-Semantic path: cosine similarity on stored embeddings (requires numpy/sentence-transformers)
-
-The search module is stateless - all state lives in the DB connection.
+The search module is stateless: all state lives in the database connection.
+The current implementation does not create embeddings or perform vector search.
 """
 
 from __future__ import annotations
@@ -17,8 +15,8 @@ from ..db.store import SymbolRecord, fts_search, get_symbols_by_name
 @dataclass(frozen=True)
 class SearchResult:
     symbol: SymbolRecord
-    score: float          # higher is better; FTS rank is negated to positive
-    source: str           # "fts" | "exact" | "prefix" | "semantic"
+    score: float  # higher is better; FTS rank is negated to positive
+    source: str  # "fts" | "exact" | "prefix"
 
 
 def search(
@@ -90,6 +88,7 @@ def _prefix_search(
         (f"{safe}%", limit),
     ).fetchall()
     from ..db.store import _row_to_symbol
+
     return [_row_to_symbol(r) for r in rows]
 
 
@@ -113,7 +112,5 @@ def search_by_file(
         (f"%{rel_path_fragment}%", limit),
     ).fetchall()
     from ..db.store import _row_to_symbol
-    return [
-        SearchResult(_row_to_symbol(r), score=2.0, source="fts")
-        for r in rows
-    ]
+
+    return [SearchResult(_row_to_symbol(r), score=2.0, source="fts") for r in rows]

@@ -1,56 +1,58 @@
 # Quickstart
 
-5 minutos para sentir o que o Semtree faz.
-
-## 1. Indexar seu projeto
+## 1. Instalar
 
 ```bash
-cd ~/projects/meu-projeto
-semtree index .
+pip install "semtree[all]"
 ```
 
-Tree-sitter parseia os arquivos, extrai símbolos (funções, classes, métodos, imports) e armazena em SQLite local (`.semtree/index.db`).
+O extra `all` inclui as gramáticas tree-sitter, a contagem de tokens e o servidor MCP.
 
-## 2. Ver o contexto cirúrgico
+## 2. Indexar o projeto atual
 
 ```bash
-semtree context "implementar autenticação OAuth"
+cd /caminho/do/projeto
+semtree index
 ```
 
-Saída: lista de símbolos relevantes com assinaturas + docstrings, sem código inteiro.
+O comando percorre os arquivos configurados, extrai símbolos das linguagens suportadas e grava o banco local em `.ctx/index.db`. Em execuções seguintes, hashes permitem pular arquivos sem alteração.
 
-```python
-# Exemplo de saída
-auth/handlers.py
-class AuthHandler:
-    def login(self, username: str, password: str) -> Token
-    def logout(self, token: Token) -> None
+Para indexar outra raiz sem mudar de diretório:
 
-auth/oauth.py
-def oauth_callback(provider: str, code: str) -> User
-    """Exchange OAuth code for user data."""
-
-config.py
-OAUTH_PROVIDERS: dict[str, ProviderConfig]
+```bash
+semtree --root /caminho/do/projeto index
 ```
 
-## 3. Buscar símbolos
+## 3. Montar contexto
+
+```bash
+semtree context "entender a autenticação" --budget 4000
+```
+
+A saída em Markdown reúne símbolos encontrados por nome, assinatura e docstring dentro do orçamento. Ela pode omitir contexto relevante; revise o resultado antes de usá-lo.
+
+## 4. Buscar símbolos
 
 ```bash
 semtree search "validate_token"
+semtree search "Auth" --kind class --limit 10
 ```
 
-Retorna todos os lugares onde aparece, com contexto.
+Use `--json` quando precisar de uma saída estruturada.
 
-## 4. Usar via Claude Code
+## 5. Integrar um assistente
 
-Após [configurar o MCP server](integrations.md):
+Confira primeiro os arquivos que seriam escritos:
 
-> "Use o semtree para entender esse projeto e me ajudar a adicionar uma feature de logout"
+```bash
+semtree setup --target all --dry-run
+```
 
-O Claude vai chamar `index_project`, `get_context` e `search_symbols` automaticamente, recebendo só o que importa.
+Claude Code e Cursor podem receber o servidor MCP. Copilot e Codex recebem instruções para chamar a CLI. Veja [Integrações](integrations.md) e [Servidor MCP](../mcp.md).
 
 ## Próximos passos
 
-- [Como funciona internamente](../concepts/how-it-works.md)
-- [Integrações com mais assistentes](integrations.md)
+- [Como funciona](../concepts/how-it-works.md)
+- [CLI completa](../cli.md)
+- [Benchmark local](../benchmarks.md)
+- [Privacidade](../privacy.md)

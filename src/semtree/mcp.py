@@ -24,8 +24,8 @@ from .retrieval.search import search
 
 
 def _get_root() -> Path:
-    """Determine project root from SEMTREE_ROOT env or cwd."""
-    env_root = os.environ.get("SEMTREE_ROOT")
+    """Determine project root from explicit env, Claude project env, or cwd."""
+    env_root = os.environ.get("SEMTREE_ROOT") or os.environ.get("CLAUDE_PROJECT_DIR")
     if env_root:
         return Path(env_root)
     return find_project_root()
@@ -34,6 +34,23 @@ def _get_root() -> Path:
 def _open_db(root: Path) -> sqlite3.Connection:
     """Open (and initialize) the semtree database."""
     return init_db(db_path(root))
+
+
+def _build_context_request(
+    query: str,
+    token_budget: int = 8000,
+    level: int | None = None,
+    file: str | None = None,
+) -> str:
+    """Build context for an MCP request while preserving an explicit level 0."""
+    root = _get_root()
+    conn = _open_db(root)
+
+    if file:
+        detail_level = level if level is not None else 2
+        return build_context_for_file(conn, file, token_budget, detail_level)
+
+    return build_context(conn, query, token_budget, root, force_level=level)
 
 
 def serve() -> None:
@@ -87,7 +104,7 @@ def serve() -> None:
     ) -> str:
         """Build a context string for an AI coding task.
 
-        Analyzes the query intent, retrieves relevant symbols, and formats
+        Analyzes the query intent, retrieves matching symbols, and formats
         them within the token budget. Use this before implementing any task
         to give the AI assistant relevant project context.
 
@@ -100,13 +117,7 @@ def serve() -> None:
         Returns:
             Formatted markdown context string ready for AI consumption.
         """
-        root = _get_root()
-        conn = _open_db(root)
-
-        if file:
-            return build_context_for_file(conn, file, token_budget, level or 2)
-
-        return build_context(conn, query, token_budget, root, force_level=level)
+        return _build_context_request(query, token_budget, level, file)
 
     @mcp.tool()
     def search_symbols(
@@ -117,7 +128,7 @@ def serve() -> None:
         """Search for symbols by name or description.
 
         Uses FTS5 full-text search across symbol names, signatures, and
-        docstrings. Supports exact name lookup and fuzzy keyword matching.
+        docstrings, with exact-name lookup and a prefix fallback.
 
         Args:
             query: Symbol name or keyword to search for.
@@ -137,19 +148,21 @@ def serve() -> None:
             sym = r.symbol
             if kind and sym.kind != kind:
                 continue
-            output.append({
-                "name": sym.name,
-                "kind": sym.kind,
-                "file": sym.file_path,
-                "line_start": sym.line_start,
-                "line_end": sym.line_end,
-                "signature": sym.signature,
-                "docstring": sym.docstring[:200] if sym.docstring else "",
-                "git_author": sym.git_author,
-                "git_date": sym.git_date,
-                "score": r.score,
-                "match_source": r.source,
-            })
+            output.append(
+                {
+                    "name": sym.name,
+                    "kind": sym.kind,
+                    "file": sym.file_path,
+                    "line_start": sym.line_start,
+                    "line_end": sym.line_end,
+                    "signature": sym.signature,
+                    "docstring": sym.docstring[:200] if sym.docstring else "",
+                    "git_author": sym.git_author,
+                    "git_date": sym.git_date,
+                    "score": r.score,
+                    "match_source": r.source,
+                }
+            )
 
         return output
 

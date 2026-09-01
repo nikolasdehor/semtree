@@ -13,25 +13,29 @@ semtree index
 semtree setup --target claude
 ```
 
-Restart Claude Code after setup so it reloads `.claude/mcp.json`.
+Restart Claude Code after setup so it reloads the project-root `.mcp.json`.
+Claude Code asks you to approve project-scoped servers before first use; the
+Semtree tools are unavailable until you approve the entry.
 
 ## Manual MCP config
 
-If you prefer to create the config yourself, add this to `.claude/mcp.json`:
+If you prefer to create the config yourself, add this to `.mcp.json` in the
+project root:
 
 ```json
 {
   "mcpServers": {
     "semtree": {
       "command": "semtree-mcp",
-      "args": [],
-      "env": {
-        "SEMTREE_ROOT": "/path/to/your/project"
-      }
+      "args": []
     }
   }
 }
 ```
+
+`semtree-mcp` must be in the PATH used by Claude Code. Claude Code supplies
+`CLAUDE_PROJECT_DIR` to the process at runtime, so this shared project config
+does not need a machine-specific checkout path.
 
 ## Available tools
 

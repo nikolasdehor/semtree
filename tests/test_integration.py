@@ -6,6 +6,7 @@ Tests the full pipeline: index -> search -> context -> CLI.
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import patch
 
 from click.testing import CliRunner
 
@@ -20,6 +21,7 @@ from semtree.memory.lite import ProjectMemory
 # Full pipeline tests
 # ---------------------------------------------------------------------------
 
+
 class TestFullPipeline:
     def test_index_then_search(self, tmp_project: Path) -> None:
         config = SemtreeConfig(use_gitignore=False, git_context=False)
@@ -28,6 +30,7 @@ class TestFullPipeline:
 
         conn = init_db(db_path(tmp_project))
         from semtree.retrieval.search import search
+
         results = search(conn, "greet", limit=10)
         assert len(results) > 0
 
@@ -61,6 +64,7 @@ class TestFullPipeline:
 # CLI integration tests
 # ---------------------------------------------------------------------------
 
+
 class TestCLI:
     def test_index_command(self, tmp_project: Path) -> None:
         runner = CliRunner()
@@ -90,6 +94,7 @@ class TestCLI:
 
     def test_search_command_json(self, tmp_project: Path) -> None:
         import json
+
         runner = CliRunner()
         runner.invoke(main, ["--root", str(tmp_project), "index", "--quiet"])
         result = runner.invoke(main, ["--root", str(tmp_project), "search", "--json", "greet"])
@@ -109,7 +114,8 @@ class TestCLI:
         runner.invoke(main, ["--root", str(tmp_project), "index", "--quiet"])
 
         result = runner.invoke(
-            main, ["--root", str(tmp_project), "memory", "add", "rule", "style", "Use black formatter"]
+            main,
+            ["--root", str(tmp_project), "memory", "add", "rule", "style", "Use black formatter"],
         )
         assert result.exit_code == 0
 
@@ -127,6 +133,7 @@ class TestCLI:
 
     def test_config_show(self, tmp_project: Path) -> None:
         import json
+
         runner = CliRunner()
         result = runner.invoke(main, ["--root", str(tmp_project), "config"])
         assert result.exit_code == 0
@@ -144,16 +151,51 @@ class TestCLI:
 
     def test_setup_claude_creates_mcp_json(self, tmp_project: Path) -> None:
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["--root", str(tmp_project), "setup", "--target", "claude"]
-        )
+        result = runner.invoke(main, ["--root", str(tmp_project), "setup", "--target", "claude"])
         assert result.exit_code == 0
-        mcp_json = tmp_project / ".claude" / "mcp.json"
+        mcp_json = tmp_project / ".mcp.json"
         assert mcp_json.exists()
         import json
+
         data = json.loads(mcp_json.read_text())
         assert "mcpServers" in data
         assert "semtree" in data["mcpServers"]
+
+    def test_setup_claude_invalid_config_fails_without_overwrite(self, tmp_project: Path) -> None:
+        mcp_json = tmp_project / ".mcp.json"
+        mcp_json.write_text("not json")
+        runner = CliRunner()
+
+        result = runner.invoke(main, ["--root", str(tmp_project), "setup", "--target", "claude"])
+
+        assert result.exit_code == 1
+        assert "invalid existing config; unchanged" in result.output
+        assert "Setup incomplete" in result.output
+        assert mcp_json.read_text() == "not json"
+
+    def test_context_file_preserves_level_zero(self, tmp_project: Path) -> None:
+        runner = CliRunner()
+        with patch(
+            "semtree.context.builder.build_context_for_file",
+            return_value="level zero context",
+        ) as build:
+            result = runner.invoke(
+                main,
+                [
+                    "--root",
+                    str(tmp_project),
+                    "context",
+                    "inspect files",
+                    "--file",
+                    "src/app.py",
+                    "--level",
+                    "0",
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert result.output == "level zero context\n"
+        assert build.call_args.args[3] == 0
 
     def test_version_flag(self) -> None:
         runner = CliRunner()

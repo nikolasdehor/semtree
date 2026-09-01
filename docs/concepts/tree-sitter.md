@@ -1,78 +1,38 @@
 # Por que tree-sitter
 
-[Tree-sitter](https://tree-sitter.github.io/tree-sitter/) é um parser generator open source criado no GitHub. Substituiu o velho Atom Linter e hoje é a base do syntax highlighting do Neovim, Helix e várias IDEs.
+[Tree-sitter](https://tree-sitter.github.io/tree-sitter/) produz árvores sintáticas a partir do texto-fonte. O Semtree usa essas árvores para localizar declarações sem iniciar compiladores ou servidores de linguagem.
 
-## Vantagens
+## Cobertura implementada
 
-### Velocidade
+O extra `semtree[parse]` instala gramáticas para:
 
-Parser incremental em C: ao editar 1 caractere, ele atualiza só os nós afetados da AST. Em projetos de 100k+ linhas, isso significa indexação inicial em segundos, atualizações em milissegundos.
+- Python;
+- JavaScript e TypeScript;
+- Go;
+- Rust;
+- Java;
+- C e C++.
 
-### Multi-linguagem com gramáticas comunitárias
+Cada linguagem possui um visitor no `extractor.py`. Os visitors reconhecem apenas os tipos de declaração implementados para aquela gramática; a cobertura não é igual entre linguagens.
 
-Mais de 100 linguagens suportadas via gramáticas mantidas por contribuidores. O Semtree usa as principais:
+## O que a análise entrega
 
-- python, typescript, javascript, tsx
-- go, rust, ruby, java
-- c, cpp, csharp
+Quando reconhecido, um símbolo contém nome, tipo, linhas inicial e final, assinatura e docstring. O indexador pode acrescentar autor e data por `git blame`.
 
-Adicionar nova linguagem é instalar a gramática:
+Tree-sitter fornece estrutura sintática. A versão atual do Semtree não resolve imports, dependências, referências, chamadas ou tipos entre arquivos, nem executa as queries declarativas mostradas em exemplos genéricos de tree-sitter.
 
-```bash
-pip install tree-sitter-elixir
-```
+## Fallback
 
-E registrar no `config.py`. Sem código novo.
+Se uma gramática não estiver instalada, Python, JavaScript, TypeScript, Go, Rust e Java possuem um fallback limitado por expressões regulares. C e C++ dependem da gramática para extrair símbolos. Outras extensões configuradas podem ser catalogadas como arquivos, sem símbolos estruturais.
 
-### Estrutural, não texto
+## Adicionar uma linguagem
 
-LSPs entendem semântica completa (imports cruzados, type checking). Tree-sitter entende **estrutura**: "isso é uma função, isso é uma classe, isso é um import". Suficiente para extrair símbolos sem precisar do compilador.
+Adicionar apenas a gramática não basta. Uma contribuição completa precisa:
 
-### Sem dependências de runtime
+1. declarar a dependência em `pyproject.toml`;
+2. registrar a gramática em `src/semtree/indexer/parser.py`;
+3. mapear as extensões em `src/semtree/indexer/walker.py`;
+4. implementar o visitor e, se desejado, o fallback em `src/semtree/indexer/extractor.py`;
+5. adicionar testes e atualizar esta página.
 
-Para parsear Python, o Semtree não precisa de um interpretador Python no PATH. Tree-sitter parseia o arquivo via gramática, ponto. Indexação portátil.
-
-## Alternativas consideradas
-
-### Por que não LSP
-
-- Cada linguagem precisa de servidor próprio (pyright, gopls, rust-analyzer)
-- Servidores são pesados (centenas de MB de RAM cada)
-- Setup complexo (precisa de Node, runtimes)
-- Lentidão acumulada em projetos grandes
-
-### Por que não ast (Python stdlib)
-
-- Só funciona pra Python
-- Não tem versão incremental
-- Não tem suporte a queries declarativas
-
-### Por que não regex
-
-- Frágil em código complexo
-- Não entende escopo (função dentro de classe, etc)
-- Cobertura ruim em linguagens com sintaxe rica
-
-## Como usamos
-
-O indexer do Semtree usa **queries declarativas** do tree-sitter:
-
-```scheme
-; Captura definições de função em Python
-(function_definition
-  name: (identifier) @name
-  parameters: (parameters) @params
-  body: (block) @body
-) @function
-
-; Captura classes
-(class_definition
-  name: (identifier) @name
-  superclasses: (argument_list)? @bases
-  body: (block) @body
-) @class
-```
-
-Essas queries são compiladas uma vez e aplicadas em cada arquivo. Resultado: símbolos com posição (linha início, linha fim), nome, assinatura, docstring.
-
-Veja `src/semtree/indexer/queries/` para todas as queries por linguagem.
+O custo e a velocidade variam com número e tamanho dos arquivos, gramáticas instaladas, Git e armazenamento. O projeto não publica uma comparação fixa com LSPs.

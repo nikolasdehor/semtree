@@ -2,7 +2,7 @@
 
 Each level produces progressively richer context:
 
-  L0 - File tree only: paths and stats
+  L0 - Symbol names + kinds per file (compact outline)
   L1 - Symbol names + kinds per file (outline)
   L2 - L1 + signatures + first line of docstring (default)
   L3 - L2 + full docstrings + git context
@@ -19,7 +19,7 @@ from ..db.store import FileRecord, SymbolRecord
 
 
 def format_file_tree(files: Sequence[FileRecord], root: Path) -> str:
-    """L0: compact file tree grouped by directory."""
+    """Compact file tree grouped by directory for policies that request it."""
     if not files:
         return ""
 

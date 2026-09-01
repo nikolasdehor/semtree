@@ -1,7 +1,7 @@
 # GitHub Copilot Integration
 
 Semtree works with GitHub Copilot Chat in VS Code by adding a reusable
-instruction that asks Copilot to load semantic context before generating code.
+instruction that asks Copilot to load structural context before generating code.
 
 ## Install
 
@@ -23,7 +23,7 @@ Add this to `.vscode/settings.json`:
 {
   "github.copilot.chat.codeGeneration.instructions": [
     {
-      "text": "When given a task, first run: semtree context \"${input}\" to load semantic context."
+      "text": "When given a task, first run: semtree context \"${input}\" to load structural context."
     }
   ]
 }

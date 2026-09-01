@@ -4,98 +4,61 @@
 
 ```mermaid
 sequenceDiagram
-    participant U as Usuário/Agente
+    participant U as Usuário ou agente
     participant S as Semtree
     participant TS as Tree-sitter
     participant DB as SQLite
 
-    U->>S: index_project(path)
-    S->>TS: parse cada arquivo
-    TS-->>S: AST por linguagem
-    S->>S: extrai símbolos (func, class, etc)
-    S->>DB: armazena com BM25 index
+    U->>S: index_project(force)
+    S->>TS: parseia arquivos suportados
+    TS-->>S: árvores sintáticas
+    S->>DB: grava símbolos e metadados
 
-    U->>S: get_context(query)
-    S->>DB: busca BM25 + semantic
-    DB-->>S: top-K símbolos
-    S-->>U: contexto cirúrgico (assinaturas + docs)
+    U->>S: get_context(query, token_budget)
+    S->>DB: busca exata, FTS5 e prefixo
+    DB-->>S: símbolos encontrados
+    S-->>U: contexto dentro do orçamento
 ```
 
-## Fases
+## 1. Descoberta e extração
 
-### 1. Indexação
+O indexador percorre extensões configuradas, respeita o `.gitignore`, ignora diretórios excluídos e limita o tamanho dos arquivos. A extração estrutural implementada cobre:
 
-Tree-sitter parseia cada arquivo do projeto na linguagem detectada. Suporta:
+- Python;
+- JavaScript e TypeScript;
+- Go;
+- Rust;
+- Java;
+- C e C++.
 
-- Python (.py)
-- TypeScript / JavaScript (.ts, .tsx, .js, .jsx)
-- Go (.go)
-- Rust (.rs)
-- Ruby (.rb)
-- Java (.java)
-- C / C++ (.c, .cpp, .h)
+Para essas linguagens, visitors específicos extraem os tipos de símbolo que a implementação reconhece, como funções, métodos, classes, tipos e constantes. Assinaturas e, quando disponíveis, docstrings acompanham os símbolos. O Semtree não resolve imports, dependências entre módulos, chamadas ou tipos como um LSP.
 
-Para cada arquivo, o indexer extrai:
+Se uma gramática opcional não estiver instalada, algumas linguagens usam um fallback por expressões regulares. Arquivos de outras extensões configuradas podem ser registrados no índice sem produzir símbolos estruturais.
 
-- Funções e métodos (com assinatura completa)
-- Classes (com métodos públicos)
-- Constantes exportadas
-- Imports / dependencies
-- Docstrings / JSDoc / rustdoc
+## 2. Persistência local
 
-### 2. Armazenamento
+O banco padrão fica em `.ctx/index.db`. Ele armazena arquivos, hashes, símbolos, assinaturas, docstrings, metadados de Git e entradas criadas pelos comandos de memória.
 
-Tudo vai pra SQLite local em `.semtree/index.db`:
+O SQLite mantém um índice FTS5 sobre nome, assinatura e docstring. O schema reserva uma coluna para embeddings, mas a versão atual não cria embeddings nem executa busca vetorial.
 
-```sql
-CREATE TABLE symbols (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
-    kind TEXT NOT NULL,  -- function, class, method, constant
-    file_path TEXT,
-    line_start INTEGER,
-    line_end INTEGER,
-    signature TEXT,
-    docstring TEXT,
-    language TEXT
-);
+## 3. Recuperação e contexto
 
-CREATE VIRTUAL TABLE symbols_fts USING fts5(
-    name, signature, docstring,
-    content='symbols', content_rowid='id'
-);
-```
+Para uma consulta, o Semtree:
 
-Índice FTS5 nativo do SQLite dá busca BM25 sem dependências extras.
+1. procura primeiro correspondência exata de nome;
+2. consulta o FTS5 por palavras do nome, assinatura e docstring;
+3. usa prefixo como fallback quando as buscas anteriores não retornam resultado;
+4. aplica a política do tipo de tarefa para ordenar e limitar símbolos;
+5. formata o resultado dentro do orçamento informado.
 
-### 3. Retrieval
+O contexto pode incluir assinaturas, docstrings, metadados de Git e uma árvore de arquivos, conforme o nível e a política escolhidos. Não há reranking por embeddings na implementação atual.
 
-Quando o agente chama `get_context(query)`:
+## Limites
 
-1. Query é normalizada e tokenizada
-2. BM25 retorna top-K matches do FTS5
-3. Reranking opcional via embeddings (se configurado)
-4. Resposta inclui só assinatura + docstring (sem corpo de função)
+- A busca é lexical e estrutural; não compreende o significado do código como um modelo ou LSP.
+- Consultas vagas podem omitir símbolos importantes.
+- O orçamento limita o volume de saída, mas não garante redução fixa nem qualidade da resposta do assistente.
+- A indexação é local. Se um cliente de IA receber o contexto gerado, o provedor desse cliente pode processar o conteúdo segundo suas próprias regras.
+- Linguagens e tipos de símbolo têm coberturas diferentes; valide o resultado no seu repositório.
 
-Custo: tipicamente **200-500 tokens** para uma query que renderia 50.000+ tokens se você colasse os arquivos.
-
-## Trade-offs
-
-| Aspecto | Semtree | Alternativa (Greptile, Cody) |
-|---------|---------|------------------------------|
-| Custo | $0 (local) | SaaS pago |
-| Privacidade | Seu código nunca sai da máquina | Sobe pra servidor remoto |
-| Setup | `pip install semtree` | API key + cadastro |
-| Personalização | Open source, hackável | Caixa preta |
-| Cobertura | Símbolos estruturais | Full text + AI rerank |
-
-Para times pequenos / projetos abertos, Semtree é suficiente. Para empresas grandes com necessidade de busca semântica profunda + colaboração, soluções SaaS valem o custo.
-
-## Por que tree-sitter
-
-- **Rápido**: parser incremental em C, 10-100x mais rápido que LSP
-- **Multi-linguagem**: gramáticas mantidas pela comunidade
-- **Estrutural**: extrai forma, não só texto
-- **Sem dependências de runtime**: não precisa do compilador/interpretador da linguagem
-
-Ver [Por que tree-sitter](tree-sitter.md) para mais detalhes.
+Veja também [Por que tree-sitter](tree-sitter.md), [Benchmark local](../benchmarks.md) e [Privacidade](../privacy.md).
