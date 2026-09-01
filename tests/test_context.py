@@ -18,6 +18,7 @@ from semtree.db.store import SymbolRecord
 # Budget tests
 # ---------------------------------------------------------------------------
 
+
 class TestTokenBudget:
     def test_count_tokens_nonempty(self) -> None:
         n = count_tokens("hello world")
@@ -66,23 +67,34 @@ class TestTokenBudget:
 # Level formatter tests
 # ---------------------------------------------------------------------------
 
+
 def _make_symbols() -> list[SymbolRecord]:
     return [
         SymbolRecord(
-            id=1, file_id=1, file_path="src/auth.py",
-            name="login", kind="function",
-            line_start=10, line_end=25,
+            id=1,
+            file_id=1,
+            file_path="src/auth.py",
+            name="login",
+            kind="function",
+            line_start=10,
+            line_end=25,
             signature="def login(username: str) -> bool:",
             docstring="Authenticate a user by username.",
-            git_author="Alice", git_date="2025-01-15",
+            git_author="Alice",
+            git_date="2025-01-15",
         ),
         SymbolRecord(
-            id=2, file_id=1, file_path="src/auth.py",
-            name="UserManager", kind="class",
-            line_start=30, line_end=80,
+            id=2,
+            file_id=1,
+            file_path="src/auth.py",
+            name="UserManager",
+            kind="class",
+            line_start=30,
+            line_end=80,
             signature="class UserManager:",
             docstring="Manages user creation and deletion.\n\nThreadsafe.",
-            git_author="Bob", git_date="2025-01-10",
+            git_author="Bob",
+            git_date="2025-01-10",
         ),
     ]
 
@@ -110,9 +122,12 @@ class TestLevels:
         assert "Alice" in text
         assert "2025-01-15" in text
 
-    def test_level_0_fallback(self) -> None:
+    def test_level_0_contains_only_names_and_kinds(self) -> None:
         text = format_by_level(_make_symbols(), level=0)
         assert "login" in text
+        assert "[function]" in text
+        assert "def login(username: str)" not in text
+        assert "Authenticate a user" not in text
 
     def test_empty_symbols_returns_empty(self) -> None:
         for level in range(4):
@@ -123,34 +138,39 @@ class TestLevels:
 # Builder tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def builder_db(tmp_path: Path) -> sqlite3.Connection:
     db_path = tmp_path / ".ctx" / "index.db"
     conn = init_db(db_path)
 
     file_id = db_store.upsert_file(conn, "app/views.py", "sha1abc", 2000, "python")
-    db_store.replace_file_symbols(conn, file_id, [
-        {
-            "name": "create_user",
-            "kind": "function",
-            "line_start": 15,
-            "line_end": 35,
-            "signature": "def create_user(name: str, email: str) -> User:",
-            "docstring": "Create a new user in the database.",
-            "git_author": "Dev",
-            "git_date": "2025-02-01",
-        },
-        {
-            "name": "UserView",
-            "kind": "class",
-            "line_start": 40,
-            "line_end": 100,
-            "signature": "class UserView(APIView):",
-            "docstring": "REST API view for user management.",
-            "git_author": "Dev",
-            "git_date": "2025-02-01",
-        },
-    ])
+    db_store.replace_file_symbols(
+        conn,
+        file_id,
+        [
+            {
+                "name": "create_user",
+                "kind": "function",
+                "line_start": 15,
+                "line_end": 35,
+                "signature": "def create_user(name: str, email: str) -> User:",
+                "docstring": "Create a new user in the database.",
+                "git_author": "Dev",
+                "git_date": "2025-02-01",
+            },
+            {
+                "name": "UserView",
+                "kind": "class",
+                "line_start": 40,
+                "line_end": 100,
+                "signature": "class UserView(APIView):",
+                "docstring": "REST API view for user management.",
+                "git_author": "Dev",
+                "git_date": "2025-02-01",
+            },
+        ],
+    )
     conn.commit()
     return conn
 
@@ -171,6 +191,7 @@ class TestBuilder:
 
     def test_build_context_respects_budget(self, builder_db: sqlite3.Connection) -> None:
         from semtree.context.budget import count_tokens
+
         result = build_context(builder_db, "test query", token_budget=500)
         # Should not massively exceed the budget
         assert count_tokens(result) < 1000  # allow some overhead

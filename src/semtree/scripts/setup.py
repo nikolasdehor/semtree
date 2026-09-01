@@ -1,21 +1,50 @@
 """Integration setup for Claude Code, Cursor, Copilot, and Codex.
 
-Creates necessary config files (e.g., .claude/mcp.json) automatically
-when running `semtree setup --auto`.
+Creates the selected project config files when running `semtree setup`.
 
 Supports --dry-run to preview changes without writing.
 """
 
 from __future__ import annotations
 
-import contextlib
 import json
+import os
 import shutil
 import sys
+import tempfile
+from contextlib import suppress
 from pathlib import Path
 from typing import Literal
 
 IntegrationTarget = Literal["claude", "cursor", "copilot", "codex", "all"]
+
+
+def _write_json_atomically(path: Path, value: dict) -> bool:
+    """Replace a JSON file without exposing a truncated intermediate state."""
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            json.dump(value, handle, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+        temporary_path = None
+        return True
+    except OSError:
+        return False
+    finally:
+        if temporary_path is not None:
+            with suppress(OSError):
+                temporary_path.unlink(missing_ok=True)
 
 
 def setup_integration(
@@ -34,6 +63,8 @@ def setup_integration(
     if target in ("claude", "all"):
         result = _setup_claude(root, dry_run=dry_run, host=host, port=port)
         results.update(result)
+        if any(action.startswith("error") for action in result.values()):
+            return results
 
     if target in ("cursor", "all"):
         result = _setup_cursor(root, dry_run=dry_run, host=host, port=port)
@@ -56,54 +87,46 @@ def _setup_claude(
     host: str,
     port: int,
 ) -> dict[str, str]:
-    """Create .claude/mcp.json with the semtree MCP server config."""
-    claude_dir = root / ".claude"
-    mcp_json = claude_dir / "mcp.json"
-
-    # Find semtree-mcp binary
-    mcp_binary = shutil.which("semtree-mcp") or _find_python_entry("semtree-mcp")
-    if mcp_binary is None:
-        # Fall back to module invocation
-        python = sys.executable
-        mcp_cmd = [python, "-m", "semtree.mcp"]
-    else:
-        mcp_cmd = [mcp_binary]
+    """Create or update the project-scoped Claude Code ``.mcp.json``."""
+    mcp_json = root / ".mcp.json"
 
     config: dict = {
         "mcpServers": {
             "semtree": {
-                "command": mcp_cmd[0],
-                "args": mcp_cmd[1:] if len(mcp_cmd) > 1 else [],
-                "env": {
-                    "SEMTREE_ROOT": str(root),
-                },
+                "command": "semtree-mcp",
+                "args": [],
             }
         }
     }
 
-    # Merge with existing config if present
-    existing: dict = {}
+    target_str = str(mcp_json)
+    if mcp_json.is_symlink():
+        return {target_str: "error (invalid existing config; unchanged)"}
     if mcp_json.exists():
-        with contextlib.suppress(json.JSONDecodeError, OSError):
-            existing = json.loads(mcp_json.read_text())
-
-    if existing:
-        # Merge mcpServers section
+        try:
+            existing = json.loads(mcp_json.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError, UnicodeError):
+            return {target_str: "error (invalid existing config; unchanged)"}
+        if not isinstance(existing, dict):
+            return {target_str: "error (invalid existing config; unchanged)"}
         servers = existing.get("mcpServers", {})
-        servers["semtree"] = config["mcpServers"]["semtree"]
-        existing["mcpServers"] = servers
-        final_config = existing
+        if not isinstance(servers, dict):
+            return {target_str: "error (invalid existing config; unchanged)"}
+        final_config = dict(existing)
+        final_config["mcpServers"] = {
+            **servers,
+            "semtree": config["mcpServers"]["semtree"],
+        }
         action = "updated"
     else:
         final_config = config
         action = "created"
 
-    target_str = str(mcp_json)
     if dry_run:
         return {target_str: f"[dry-run] would be {action}"}
 
-    claude_dir.mkdir(parents=True, exist_ok=True)
-    mcp_json.write_text(json.dumps(final_config, indent=2) + "\n")
+    if not _write_json_atomically(mcp_json, final_config):
+        return {target_str: "error (write failed; unchanged)"}
     return {target_str: action}
 
 
@@ -147,7 +170,7 @@ def _setup_copilot(root: Path, dry_run: bool) -> dict[str, str]:
     semtree_bin = shutil.which("semtree") or "semtree"
     copilot_key = "github.copilot.chat.codeGeneration.instructions"
     new_instruction = {
-        "text": f"When given a task, first run: {semtree_bin} context \"${{input}}\" to load semantic context."
+        "text": f'When given a task, first run: {semtree_bin} context "${{input}}" to load structural context.'
     }
 
     target_str = str(settings_json)
@@ -184,7 +207,7 @@ def _setup_codex(root: Path, dry_run: bool) -> dict[str, str]:
     if target_file is None:
         target_file = root / "AGENTS.md"
 
-    snippet = "\n\n## Code Context\n\nRun `semtree context \"<task description>\"` before implementing any task to get relevant code context.\n"
+    snippet = '\n\n## Code Context\n\nRun `semtree context "<task description>"` before implementing any task to get relevant code context.\n'
     target_str = str(target_file)
 
     if dry_run:

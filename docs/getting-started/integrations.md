@@ -1,91 +1,65 @@
 # Integrações
 
-O Semtree expõe-se como **servidor MCP** padrão, funcionando com qualquer cliente compatível.
+O Semtree oferece duas formas de integração:
 
-## Claude Code (desktop)
+- Claude Code e Cursor podem executar as três ferramentas pelo servidor `semtree-mcp` via `stdio`;
+- Copilot e Codex recebem instruções para chamar `semtree context` pela CLI.
 
-Edite `claude_desktop_config.json`:
-
-=== "macOS / Linux"
-
-    `~/Library/Application Support/Claude/claude_desktop_config.json`
-
-    ```json
-    {
-      "mcpServers": {
-        "semtree": {
-          "command": "semtree",
-          "args": ["mcp"]
-        }
-      }
-    }
-    ```
-
-=== "Windows"
-
-    `%APPDATA%\Claude\claude_desktop_config.json`
-
-    ```json
-    {
-      "mcpServers": {
-        "semtree": {
-          "command": "semtree.exe",
-          "args": ["mcp"]
-        }
-      }
-    }
-    ```
-
-Reinicie o Claude Desktop. As tools `index_project`, `get_context`, `search_symbols` aparecem disponíveis.
-
-## Claude Code (CLI)
+O comando `setup` escreve arquivos no projeto. Visualize o resultado antes:
 
 ```bash
-claude mcp add semtree semtree mcp
+semtree setup --target all --dry-run
 ```
 
-## Cursor
+## Claude Code
 
-Settings -> MCP Servers:
+```bash
+semtree setup --target claude
+```
+
+O comando cria ou atualiza `.mcp.json` na raiz do projeto, preservando outros servidores quando o JSON e `mcpServers` são válidos:
 
 ```json
 {
   "mcpServers": {
     "semtree": {
-      "command": "semtree",
-      "args": ["mcp"]
+      "command": "semtree-mcp",
+      "args": []
     }
   }
 }
 ```
 
-## GitHub Copilot (via VS Code MCP)
+O executável `semtree-mcp` precisa estar no PATH usado pelo Claude Code. Em runtime, o servidor usa `CLAUDE_PROJECT_DIR`, fornecido pelo próprio Claude Code, por isso o arquivo compartilhável não contém um caminho absoluto do checkout.
 
-Se você usa o GitHub Copilot Chat com [MCP extension](https://marketplace.visualstudio.com/) habilitado, adicione no `settings.json`:
+Se `.mcp.json` contiver JSON inválido ou `mcpServers` não for um objeto, o setup não sobrescreve o arquivo e informa o erro. Depois de configurar, reinicie o Claude Code. Por segurança, o Claude Code solicita aprovação antes de usar um servidor de escopo do projeto vindo de `.mcp.json`; as ferramentas só ficam disponíveis após essa aprovação.
 
-```json
-{
-  "mcp.servers": {
-    "semtree": {
-      "command": "semtree",
-      "args": ["mcp"]
-    }
-  }
-}
+## Cursor
+
+```bash
+semtree setup --target cursor
 ```
 
-## Codex (OpenAI)
+O comando grava `.cursor/mcp.json` com o mesmo servidor `stdio` e a raiz do projeto em `SEMTREE_ROOT`.
 
-Codex CLI v0.130+ suporta MCP. Veja `examples/integrations/codex.md` no repo.
+## GitHub Copilot
 
-## Uso em prompts
+```bash
+semtree setup --target copilot
+```
 
-Independente do cliente, formule o prompt assim:
+Esse alvo adiciona uma instrução em `.vscode/settings.json` para executar `semtree context`. Ele não registra as três ferramentas MCP.
 
-> "Use o semtree para indexar esse projeto e me dar contexto sobre como fazer X"
+## Codex
 
-Ou diretamente:
+```bash
+semtree setup --target codex
+```
 
-> "Procure no semtree todas as funções que tocam autenticação"
+Esse alvo adiciona uma seção a `AGENTS.md` ou `CODEX.md`, orientando o uso de `semtree context`. Ele não altera a configuração MCP global do Codex.
 
-O assistente chama as tools certas automaticamente.
+## Configuração manual de um cliente MCP
+
+Para outro cliente compatível com servidores `stdio`, use o executável `semtree-mcp`, sem argumentos de transporte, e defina `SEMTREE_ROOT` no ambiente do processo. A versão atual não oferece servidor HTTP.
+
+Após configurar Claude ou Cursor, as ferramentas disponíveis são `index_project`, `get_context` e `search_symbols`. Confira os schemas em [Servidor MCP](../mcp.md).

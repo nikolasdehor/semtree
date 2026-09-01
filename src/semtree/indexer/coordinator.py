@@ -3,8 +3,8 @@
 Orchestrates: walk -> hash -> parse -> extract -> git blame -> store.
 
 Features:
-- Debounce: skip re-index if re-run within the last 2 seconds
-- Lock file: prevent concurrent writes with .ctx/indexing.lock
+- Recent-marker check: skip when an indexing marker younger than 2 seconds exists
+- Marker file: reduces overlapping work through .ctx/indexing.lock
 - Incremental: only re-process files whose SHA-1 has changed
 - Progress callback for CLI display
 """

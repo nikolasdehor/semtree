@@ -1,9 +1,9 @@
 site_name: Semtree
-site_description: Contexto otimizado para AI assistants. Indexação semântica de código fonte para Claude Code, Cursor, Copilot e Codex.
-site_url: https://nikolasdehor.github.io/semtree/
+site_description: Índice estrutural local para selecionar contexto de código para assistentes de IA.
+site_url: https://dehor-labs.github.io/semtree/
 site_author: Nikolas de Hor
-repo_url: https://github.com/nikolasdehor/semtree
-repo_name: nikolasdehor/semtree
+repo_url: https://github.com/DeHor-Labs/semtree
+repo_name: DeHor-Labs/semtree
 edit_uri: edit/main/docs/
 
 theme:
@@ -123,6 +123,9 @@ nav:
   - CLI: cli.md
   - MCP server: mcp.md
   - Benchmarks: benchmarks.md
+  - Caso técnico: case-study.md
+  - FAQ: faq.md
+  - Privacidade: privacy.md
   - Referência API: reference/
   - Contribuir: contributing.md
   - Changelog: changelog.md

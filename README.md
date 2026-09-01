@@ -1,17 +1,17 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/semtree-optimized%20context-0d1117?style=for-the-badge&labelColor=0d1117&color=6e40c9" alt="semtree" height="48">
+  <img src="https://img.shields.io/badge/semtree-structural%20context-0d1117?style=for-the-badge&labelColor=0d1117&color=6e40c9" alt="semtree" height="48">
 </p>
 
 <p align="center">
-  <strong>Semtree melhora o contexto de AI assistants</strong>
+  <strong>Semtree seleciona contexto estrutural para AI assistants</strong>
 </p>
 
 <p align="center">
   <a href="https://pypi.org/project/semtree/"><img src="https://img.shields.io/pypi/v/semtree?color=6e40c9&label=PyPI" alt="PyPI version"></a>
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11%2B-3776ab?logo=python&logoColor=white" alt="Python 3.11+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-22c55e" alt="License MIT"></a>
-  <a href="https://github.com/nikolasdehor/semtree/actions/workflows/ci.yml"><img src="https://github.com/nikolasdehor/semtree/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <img src="https://img.shields.io/github/stars/nikolasdehor/semtree?style=flat&color=6e40c9" alt="Stars">
+  <a href="https://github.com/DeHor-Labs/semtree/actions/workflows/ci.yml"><img src="https://github.com/DeHor-Labs/semtree/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/github/stars/DeHor-Labs/semtree?style=flat&color=6e40c9" alt="Stars">
 </p>
 
 <p align="center">
@@ -19,14 +19,14 @@
   <a href="#features">Features</a> ·
   <a href="#cli-commands">CLI</a> ·
   <a href="#mcp-integration">MCP</a> ·
-  <a href="#why-semtree-vs-context-lens">Comparison</a>
+  <a href="#scope-and-limits">Scope</a>
 </p>
 
 ---
 
-**Pare de colar arquivos inteiros no seu assistente de IA.** O Semtree usa tree-sitter para extrair apenas o que importa (assinaturas, docstrings, dependências) e entregar um contexto cirúrgico para Claude Code, Cursor, Copilot e Codex.
+**Pare de colar arquivos inteiros no seu assistente de IA.** Com as gramáticas opcionais instaladas, o Semtree usa tree-sitter para extrair símbolos suportados, assinaturas e docstrings e montar contexto dentro de um orçamento configurável. Sem elas, há fallbacks limitados para parte das linguagens.
 
-Resultado prático: **Respostas mais rápidas, sugestões de código mais precisas e uma redução de até 87% no uso de tokens contextuais.** Ele expõe ferramentas MCP (`index_project`, `get_context`, `search_symbols`) para que seu assistente de IA favorite a qualidade do contexto em vez da quantidade.
+O Semtree inclui um [benchmark local](docs/benchmarks.md) que compara o volume bruto de um projeto sintético com o contexto recuperado para consultas definidas no próprio script. Ele mede o seu ambiente sem prometer uma redução fixa. O Semtree expõe ferramentas MCP (`index_project`, `get_context`, `search_symbols`) para indexar, buscar símbolos e montar contexto estrutural.
 
 ---
 
@@ -38,65 +38,53 @@ semtree index
 semtree setup --target all
 ```
 
-The `setup` command writes config files for every assistant automatically (see [MCP Integration](#mcp-integration)).
+The `setup` command writes MCP configuration to `.mcp.json` for Claude Code and `.cursor/mcp.json` for Cursor, and CLI context instructions for Copilot and Codex (see [MCP Integration](#mcp-integration)).
 
 ---
 
-## Token Savings
+## Token Budgeting
 
-Feeding raw source files to an AI assistant wastes context. semtree extracts only the symbols relevant to your task.
+Feeding raw source files to an AI assistant can consume more context than a task needs. Semtree selects symbols that match the query within a configurable budget.
 
-```
-Before  45,000 tokens  (entire src/ directory pasted into context)
-After    6,000 tokens  (semtree context "add rate limiting to the API")
+The reduction depends on repository size, query, language support, index state, and the configured budget. The bundled benchmark measures a synthetic project and prints the result from the version running locally; it is not a fixed performance promise.
 
-Savings: ~87%
-```
-
-The context budget is configurable (default: 8,000 tokens). Pass `--budget` on the CLI or set `default_token_budget` in `.ctx/semtree.json`.
+The context budget is configurable (default: 8,000 tokens). Pass `--budget` on the CLI or set `default_token_budget` in `.ctx/semtree.json`. See [Benchmark local](docs/benchmarks.md) to reproduce the current comparison.
 
 ---
 
 ## Features
 
 **Multi-language symbol extraction**
-tree-sitter parses Python, JavaScript, TypeScript, Go, Rust, Java, C, and C++. Docstrings, signatures, and git metadata are extracted for every function, class, method, constant, and type definition.
+With the `parse` extra installed, tree-sitter parses Python, JavaScript, TypeScript, Go, Rust, Java, C, and C++. Visitors específicos extraem as declarações implementadas para cada linguagem, com assinaturas, docstrings disponíveis e metadados de Git.
 
 **Intent-aware retrieval**
-The intent classifier scores your query using weighted signals (keyword overlap, structural cues, file-path hints) to select the optimal retrieval strategy - not a simple regex match.
+The intent classifier scores explicit query patterns and selects a policy that controls preferred symbol kinds, detail level, limits, and optional file-tree output.
 
 **Token-budgeted context builder**
-Context output is shaped to a configurable token budget. The detail level (0 = minimal signatures, 3 = full docstrings + git context) is chosen automatically or overridden per call.
+Context output is shaped to a configurable token budget. The detail level (0 = symbol names and kinds, 3 = full docstrings + git context) is chosen automatically or overridden per call.
 
-**MCP auto-configuration**
-`semtree setup` writes `.claude/mcp.json`, `.cursor/mcp.json`, `.vscode/settings.json`, and `AGENTS.md` in one command. Three MCP tools are immediately available to connected assistants.
+**Assistant setup**
+`semtree setup` writes `.mcp.json` for Claude Code and `.cursor/mcp.json` for Cursor. For Copilot and Codex, it adds instructions that call the `semtree context` CLI; those targets do not receive the three MCP tools from this setup.
 
 **Project memory**
-Store rules, references, and notes directly in the index database. Memory entries are included in context output so your AI assistant carries persistent project-specific knowledge.
+Store, list, and remove local rules, references, and notes in the index database. The current context builder does not append those entries automatically.
 
 **Git temporal context**
 Every symbol is annotated with the git author and date from `git blame`. Assistants can see who last touched a function and when.
 
-**Concurrent-safe indexing**
-A lock file prevents two concurrent processes from corrupting the SQLite database. Incremental indexing uses SHA-1 hashes to skip unchanged files.
-
-**Hook debounce**
-The file-watcher integration applies a 2-second cooldown so rapid consecutive saves do not trigger redundant re-indexing.
+**Incremental indexing**
+SHA-1 hashes skip unchanged files. A local marker reduces overlapping indexing attempts, while SQLite transactions protect each write operation.
 
 ---
 
-## Why semtree vs context-lens
+## Scope and limits
 
-| Feature | semtree | context-lens |
-|---|---|---|
-| Multi-language docstrings (Python, JS/TS, Go, Rust) | Yes | Python only |
-| MCP auto-config (.claude/mcp.json) | Yes | Manual |
-| Hook debounce (2s cooldown) | Yes | No (fires every write) |
-| Git temporal context (author, date) | Yes | No |
-| Intent detection confidence | Weighted scoring | Regex 30% |
-| Typed store returns | Dataclasses | Raw sqlite3.Row |
-| Modular CLI | Click groups | 1000-line monolith |
-| Concurrent-safe indexing | Lock file | No protection |
+- Retrieval uses exact name matching, SQLite FTS5, and a prefix fallback; it is not semantic or vector search.
+- Without the optional tree-sitter parsers, Python, JavaScript, TypeScript, Go, Rust, and Java use limited regular-expression fallbacks; C and C++ require their grammars for symbol extraction.
+- The index stores symbols and available documentation, not imports, dependencies, references, or call graphs.
+- Context selection can omit relevant code and does not replace file inspection, tests, or review.
+- Token reduction varies by query, repository, parser coverage, and budget; the bundled benchmark measures volume only.
+- Claude Code and Cursor can use the MCP tools. The built-in Copilot and Codex setup writes CLI instructions instead.
 
 ---
 
@@ -126,7 +114,7 @@ MCP Server (mcp.py)
   index_project | get_context | search_symbols
      |
      v
-AI Assistant (Claude Code / Cursor / Copilot / Codex)
+MCP Client (Claude Code / Cursor)
 ```
 
 ---
@@ -139,7 +127,7 @@ semtree index --force            Re-index all files, ignoring cache
 
 semtree context "QUERY"          Build context for a task, print to stdout
 semtree context "QUERY" -b 4000  Limit context to 4,000 tokens
-semtree context "QUERY" -l 0     Override detail level (0=minimal, 3=full)
+semtree context "QUERY" -l 0     Override detail level (0=names/kinds, 3=full)
 semtree context "QUERY" -f FILE  Restrict context to a single file
 semtree context "QUERY" -o FILE  Write context to a file instead of stdout
 
@@ -174,21 +162,20 @@ semtree config --init            Write default config to .ctx/semtree.json
 semtree setup --target claude
 ```
 
-This creates or updates `.claude/mcp.json` in your project root with the `semtree-mcp` server entry. Restart Claude Code and the three MCP tools appear automatically.
+This creates or updates `.mcp.json` in your project root with the `semtree-mcp` server entry. Existing valid servers are preserved; invalid JSON or an invalid `mcpServers` value is left unchanged and reported as an error. The executable must be available in the PATH used by Claude Code. At runtime, Semtree uses the `CLAUDE_PROJECT_DIR` supplied by Claude Code, so the shared config does not contain a machine-specific checkout path.
+
+Restart Claude Code after setup. Claude Code asks you to approve project-scoped servers from `.mcp.json` before first use; the tools become available only after that approval.
 
 ### Manual
 
-Add to `.claude/mcp.json`:
+Add to `.mcp.json` in the project root:
 
 ```json
 {
   "mcpServers": {
     "semtree": {
       "command": "semtree-mcp",
-      "args": [],
-      "env": {
-        "SEMTREE_ROOT": "/path/to/your/project"
-      }
+      "args": []
     }
   }
 }
@@ -221,9 +208,12 @@ semtree reads `.ctx/semtree.json` in the project root. Run `semtree config --ini
   "include_extensions": [".py", ".js", ".ts", ".tsx", ".jsx",
                          ".go", ".rs", ".java", ".c", ".cpp",
                          ".h", ".hpp", ".rb", ".php", ".swift",
-                         ".kt", ".cs", ".md", ".yaml", ".toml", ".json"],
-  "exclude_dirs": [".git", "node_modules", "__pycache__", ".venv",
-                   "dist", "build", "target", ".ctx"],
+                         ".kt", ".cs", ".md", ".txt", ".yaml", ".yml",
+                         ".toml", ".json"],
+  "exclude_dirs": [".git", ".hg", ".svn", "node_modules", "__pycache__",
+                   ".venv", "venv", "env", ".env", "dist", "build",
+                   "target", ".ctx", ".idea", ".vscode", "*.egg-info",
+                   "coverage", ".coverage", "htmlcov"],
   "max_file_size_kb": 512,
   "use_gitignore": true,
   "default_token_budget": 8000,
@@ -235,14 +225,14 @@ semtree reads `.ctx/semtree.json` in the project root. Run `semtree config --ini
 
 | Key | Default | Description |
 |---|---|---|
-| `include_extensions` | (list above) | File extensions to index |
+| `include_extensions` | (list above) | File extensions to scan; structural extraction covers the eight parser languages listed above |
 | `exclude_dirs` | (list above) | Directories to skip |
 | `max_file_size_kb` | `512` | Skip files larger than this |
 | `use_gitignore` | `true` | Respect `.gitignore` patterns |
 | `default_token_budget` | `8000` | Default token limit for context output |
 | `git_context` | `true` | Annotate symbols with git author and date |
-| `mcp_host` | `127.0.0.1` | MCP server bind host |
-| `mcp_port` | `5137` | MCP server port |
+| `mcp_host` | `127.0.0.1` | Reserved configuration value; the current MCP server uses stdio |
+| `mcp_port` | `5137` | Reserved configuration value; the current MCP server does not bind a port |
 
 ---
 
@@ -257,9 +247,9 @@ pip install "semtree[all]"
 Install only what you need:
 
 ```bash
-pip install semtree            # CLI only (no parsing, no tokens, no MCP)
-pip install "semtree[parse]"   # + tree-sitter parsers (required for indexing)
-pip install "semtree[tokens]"  # + tiktoken (accurate token counting)
+pip install semtree            # CLI + limited regex fallback + approximate token counting
+pip install "semtree[parse]"   # + tree-sitter parsers for structural extraction
+pip install "semtree[tokens]"  # + tiktoken-based token counting
 pip install "semtree[mcp]"     # + MCP server support
 ```
 
@@ -275,7 +265,7 @@ After the first `semtree index`, a `.ctx/` directory is created in your project 
 .ctx/
   index.db       SQLite database (files, symbols with FTS5, memory)
   semtree.json   Config (created by semtree config --init)
-  indexing.lock  Lock file preventing concurrent writes
+  indexing.lock  Short-lived marker that reduces overlapping indexing attempts
 ```
 
 Add `.ctx/index.db` to `.gitignore` if you do not want to commit the index.
@@ -291,5 +281,5 @@ MIT. See [LICENSE](LICENSE).
 <p align="center">
   Built by <a href="https://github.com/nikolasdehor">Nikolas de Hor</a>
   <br>
-  <sub>Feed smart context to your AI assistant, not raw files</sub>
+  <sub>Select structural context before sending code to your AI assistant</sub>
 </p>

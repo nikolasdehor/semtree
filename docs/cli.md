@@ -1,116 +1,74 @@
 # CLI
 
-`semtree` é a única binary do projeto. Todos os comandos abaixo são subcomandos.
+O pacote instala dois executáveis: `semtree`, para operações locais, e `semtree-mcp`, para o servidor MCP por `stdio`.
 
-## Comandos principais
+Use `semtree --root /caminho/do/projeto <comando>` para selecionar outra raiz. Sem `--root`, a CLI procura um marcador de projeto a partir do diretório atual.
 
-### `semtree index <path>`
-
-Indexa um projeto.
+## Indexação
 
 ```bash
-semtree index .                 # projeto atual
-semtree index ~/code/meu-app    # projeto específico
-semtree index . --force         # reconstrói do zero
+semtree index
+semtree index --force
+semtree index --quiet
 ```
 
-Cria `.semtree/index.db` na raiz do projeto. Reuse a indexação em runs subsequentes (incremental).
+`index` não recebe um caminho posicional. A execução incremental pula arquivos cujo hash não mudou; `--force` reprocessa todos. O banco padrão é `.ctx/index.db`.
 
-### `semtree context <query>`
-
-Gera contexto cirúrgico para uma query.
+## Contexto
 
 ```bash
 semtree context "implementar paginação"
-semtree context "como funciona auth" --limit 10
-semtree context "validar input" --format json
+semtree context "entender auth" --budget 4000 --level 2
+semtree context "validar entrada" --file src/api.py
+semtree context "revisar pagamento" --output contexto.md
 ```
 
-Saída padrão: lista de símbolos relevantes com assinatura + docstring. `--format json` para uso programático.
+Opções: `--budget/-b`, `--level/-l` de 0 a 3, `--file/-f` e `--output/-o`. A saída é Markdown; não existe opção `--format` na versão atual.
 
-### `semtree search <pattern>`
-
-Busca símbolos por nome exato ou padrão.
+## Busca
 
 ```bash
 semtree search "validate_token"
-semtree search "Auth*"               # wildcard
-semtree search "login" --kind function
+semtree search "Auth" --kind class --limit 10
+semtree search "login" --json
 ```
 
-`--kind` filtra por tipo: `function`, `class`, `method`, `constant`.
+`search` consulta nomes, assinaturas e docstrings. `--kind/-k` filtra o tipo, `--limit/-n` limita resultados e `--json` muda a serialização. A consulta não aceita sintaxe própria de wildcard.
 
-### `semtree mcp`
-
-Inicia servidor MCP (stdio). Use através de cliente MCP (Claude, Cursor, etc).
+## Estado e memória
 
 ```bash
-semtree mcp                      # stdio padrão
-semtree mcp --transport http     # HTTP transport
+semtree status
+semtree memory add rule estilo "Use imports absolutos"
+semtree memory add ref arquitetura docs/architecture.md
+semtree memory add note migracao "Revisar antes do release"
+semtree memory list
+semtree memory list --kind rule
+semtree memory remove note migracao
 ```
 
-## Comandos utilitários
+`status` mostra raiz, banco, número de arquivos e símbolos, idade da atualização, orçamento e uso de metadados Git. A versão atual não possui comandos `stats` ou `clean`.
 
-### `semtree stats`
-
-Estatísticas do índice atual.
+## Setup de assistentes
 
 ```bash
-semtree stats
-# Symbols:     5,234
-# Functions:   2,103
-# Classes:     412
-# Languages:   python (4,521), typescript (713)
-# Size:        2.3 MB
+semtree setup --target all --dry-run
+semtree setup --target claude
+semtree setup --target cursor
+semtree setup --target copilot
+semtree setup --target codex
 ```
 
-### `semtree clean`
-
-Remove o índice. Útil quando o projeto muda muito.
-
-```bash
-semtree clean       # remove .semtree/
-semtree clean -y    # sem confirmação
-```
+Claude Code recebe configuração em `.mcp.json` na raiz e solicita aprovação do servidor de escopo do projeto antes do primeiro uso. Cursor recebe `.cursor/mcp.json`. Copilot recebe uma instrução de contexto em `.vscode/settings.json`; Codex recebe uma instrução em `AGENTS.md` ou `CODEX.md`. Confira [Integrações](getting-started/integrations.md).
 
 ## Configuração
 
-Variáveis de ambiente:
-
-| Variável | Default | Descrição |
-|----------|---------|-----------|
-| `SEMTREE_INDEX_PATH` | `.semtree` | Diretório do índice |
-| `SEMTREE_LANGUAGES` | auto-detect | Lista CSV de linguagens (ex: `python,typescript`) |
-| `SEMTREE_MAX_FILE_SIZE` | `1048576` | Tamanho máximo de arquivo (1MB default) |
-| `SEMTREE_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR` |
-
-## Casos de uso comuns
-
-### Pre-commit hook
-
-Reindexa antes de cada commit:
-
 ```bash
-# .git/hooks/pre-commit
-#!/bin/sh
-semtree index . --quiet
+semtree config
+semtree config --show
+semtree config --init
 ```
 
-### CI
+`--init` grava os padrões em `.ctx/semtree.json`. O servidor MCP reconhece `SEMTREE_ROOT` e usa `CLAUDE_PROJECT_DIR` como fallback no Claude Code; o logging também lê `SEMTREE_DEBUG`. As demais opções documentadas ficam no arquivo JSON, não em variáveis de ambiente.
 
-Verifica que o índice está atualizado:
-
-```yaml
-- name: Re-index for review tools
-  run: |
-    pip install semtree
-    semtree index .
-```
-
-### Integração programática
-
-```bash
-# Pega contexto e passa pro Claude via API
-context=$(semtree context "$task" --format json)
-claude --tools <(echo "$context") "implemente"
-```
+Para listar a interface instalada, use `semtree --help` e `semtree <comando> --help`.
